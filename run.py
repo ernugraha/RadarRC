@@ -1,52 +1,39 @@
 # run.py
-"""
-RadarRC Launcher
-Jalankan ATC24 bridge (subprocess) + frontend (main process).
-"""
 
-import subprocess
 import sys
-import os
-import signal
-import time
+import asyncio
+from PySide6.QtWidgets import QApplication
+from qasync import QEventLoop
 
-# Deteksi apakah program berjalan sebagai hasil build (.exe / AppImage)
-if getattr(sys, 'frozen', False):
-    project_root = sys._MEIPASS
-else:
-    project_root = os.path.dirname(os.path.abspath(__file__))
-
-# Paksa pindah ke direktori yang benar
-os.chdir(project_root)
+from frontend.main_window import MainWindow
+from backend.api_client import DataClient
 
 def main():
-    print("[RadarRC] Starting ATC24 bridge...")
+    app = QApplication(sys.argv)
 
-    # Gunakan project_root sebagai cwd agar backend juga aman saat di-build
-    backend_proc = subprocess.Popen(
-        [sys.executable, "-m", "backend.atc24_bridge"],
-        cwd=project_root,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    )
+    # 1. Buat event loop qasync
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
 
-    time.sleep(2)
+    # 2. Inisialisasi UI
+    window = MainWindow()
+    window.show()
 
-    try:
-        print("[RadarRC] Starting frontend...")
-        from frontend.main import main as frontend_main
-        frontend_main()
-    except KeyboardInterrupt:
-        print("\n[RadarRC] Stopped by user.")
-    finally:
-        print("[RadarRC] Stopping bridge...")
-        backend_proc.send_signal(signal.SIGINT)
-        try:
-            backend_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            backend_proc.kill()
-        print("[RadarRC] Done.")
+    # 3. Inisialisasi Backend dan Hubungkan Sinyal
+    client = DataClient()
 
+    # Tampilkan log status koneksi ke terminal
+    client.connection_status.connect(lambda msg: print(msg))
+
+    # Hubungkan data pesawat dari backend ke fungsi update UI
+    client.aircraft_data_received.connect(window.update_aircraft)
+
+    # 4. Jalankan koneksi WebSocket di background
+    loop.create_task(client.connect())
+
+    # 5. Jalankan aplikasi
+    with loop:
+        sys.exit(loop.run_forever())
 
 if __name__ == "__main__":
     main()
