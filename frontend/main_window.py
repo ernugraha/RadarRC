@@ -159,8 +159,8 @@ class MainWindow(QMainWindow):
             if selected_items and isinstance(selected_items[0], AircraftItem):
                 self.info_panel.set_flight_data(selected_items[0].callsign, self.current_data[selected_items[0].callsign])
             msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Assets Diperbarui")
-            msg_box.setText(message + "\n\nIkon dan logo baru telah dimuat secara otomatis.")
+            msg_box.setWindowTitle("Assets Updated")
+            msg_box.setText(message + "\n\nNew icons and logos have been loaded automatically.")
             msg_box.exec()
 
     def get_panel_height(self):

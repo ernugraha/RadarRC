@@ -128,13 +128,6 @@ class AircraftItem(QGraphicsItem):
         else:
             painter.setOpacity(1.0) # Ikon terlihat jelas
 
-        # 3. Gambar Outline Merah Tipis (Hanya saat emergency)
-        if self.is_emergency:
-            painter.setPen(QPen(QColor("#ff0000"), 1.5))
-            painter.setBrush(Qt.NoBrush)
-            # Lingkaran kecil pas di sekeliling ikon
-            painter.drawEllipse(-self.icon_size/2 - 2, -self.icon_size/2 - 2, self.icon_size + 4, self.icon_size + 4)
-
         # 4. Gambar Ikon Pesawat
         icon_name = get_icon_for_aircraft(self.aircraft_type)
         renderer = _SVG_CACHE.get(icon_name) if icon_name else None

@@ -175,11 +175,18 @@ class FlightPanel(QFrame):
         parts = callsign.split("-")
         flight_num = parts[-1] if len(parts) > 1 else ""
         display_name = f"{icao}{flight_num}" if icao != "???" else parts[0]
+
+        if len(display_name) > 12:
+            display_name = display_name[:10] + ".."
+
         self.lbl_callsign.setText(display_name)
 
         ac_type = info.get("aircraftType", "Unknown").upper()
-        if len(ac_type) > 12: ac_type = ac_type[:10] + "..."
+        # KUNCI: Potong tipe pesawat jika lebih dari 12 karakter
+        if len(ac_type) > 12:
+            ac_type = ac_type[:10] + "..."
         self.lbl_type.setText(ac_type)
+
         self.lbl_speed.setText(f"{int(info.get('speed', 0))} kts")
 
         dep_code = info.get("plan_departing", "")
@@ -766,7 +773,7 @@ class EmergencyAlertPanel(QFrame):
         self.setStyleSheet("""
             QFrame#EmergencyPanel {
                 background-color: rgba(40, 0, 0, 0.95);
-                border: 2px solid #ff0000;
+                border: 1px solid #ff0000;
                 border-radius: 10px;
             }
             QLabel { color: white; }
