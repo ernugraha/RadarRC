@@ -118,13 +118,25 @@ class MainWindow(QMainWindow):
 
     def on_update_finished(self, success, message):
         if success:
+            # 1. Muat ulang ikon pesawat dari folder assets/planes
+            from frontend.map_items import load_icons
+            load_icons("assets/planes")
+
+            # 2. Paksa semua pesawat di layar untuk menggambar ulang ikon barunya
+            for plane in self.aircraft_items.values():
+                plane.update()
+
+            # 3. (Opsional) Jika logo maskapai diperbarui, paksa panel info untuk refresh
+            selected_items = self.scene.selectedItems()
+            if selected_items and isinstance(selected_items[0], AircraftItem):
+                self.info_panel.set_flight_data(selected_items[0].callsign, self.current_data[selected_items[0].callsign])
+
+            # 4. Tampilkan notifikasi tanpa memaksa restart
             msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Pembaruan Tersedia")
-            msg_box.setText(message)
+            msg_box.setWindowTitle("Assets Diperbarui")
+            msg_box.setText(message + "\n\nIkon dan logo baru telah dimuat secara otomatis.")
             msg_box.setIcon(QMessageBox.Information)
-            msg_box.setStandardButtons(QMessageBox.Ok)
-            if msg_box.exec() == QMessageBox.Ok:
-                os.execl(sys.executable, sys.executable, *sys.argv)
+            msg_box.exec()
 
     def get_panel_height(self):
         available_height = self.height() - 190

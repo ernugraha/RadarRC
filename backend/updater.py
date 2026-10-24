@@ -12,22 +12,25 @@ from PySide6.QtCore import QThread, Signal
 # GANTI DENGAN USERNAME DAN REPO GITHUB ANDA
 GITHUB_REPO = "ernugraha/RadarRC"
 BRANCH = "main"
-VERSION_FILE = "data/version.txt"
+VERSION_FILE = "data/assets_version.txt" # Menyimpan hash khusus aset
 
 class AutoUpdater(QThread):
     update_finished = Signal(bool, str) # (berhasil, pesan)
 
     def run(self):
         try:
-            # 1. Cek commit terakhir di GitHub
-            api_url = f"https://api.github.com/repos/{GITHUB_REPO}/commits/{BRANCH}"
+            # 1. Cek commit terakhir KHUSUS folder 'assets' di GitHub
+            api_url = f"https://api.github.com/repos/{GITHUB_REPO}/commits?path=assets&per_page=1"
             req = urllib.request.Request(api_url, headers={'User-Agent': 'RadarRC-Updater'})
 
             with urllib.request.urlopen(req) as response:
                 data = json.loads(response.read().decode())
-                latest_sha = data['sha']
+                if not data:
+                    self.update_finished.emit(False, "No assets on github.")
+                    return
+                latest_sha = data[0]['sha']
 
-            # 2. Cek versi lokal
+            # 2. Cek versi aset lokal
             local_sha = ""
             if os.path.exists(VERSION_FILE):
                 with open(VERSION_FILE, "r") as f:
@@ -35,7 +38,7 @@ class AutoUpdater(QThread):
 
             # Jika sama, tidak perlu update
             if latest_sha == local_sha:
-                self.update_finished.emit(False, "Aplikasi sudah versi terbaru.")
+                self.update_finished.emit(False, "Assets are on newest version.")
                 return
 
             # 3. Unduh ZIP kode terbaru
@@ -50,27 +53,21 @@ class AutoUpdater(QThread):
             with zipfile.ZipFile(io.BytesIO(zip_data)) as z:
                 z.extractall(temp_dir)
 
-            # 5. Timpa file di folder proyek (KECUALI data dan assets)
+            # 5. Timpa HANYA folder 'assets'
             extracted_folder = os.path.join(temp_dir, f"RadarRC-{BRANCH}")
+            src_assets = os.path.join(extracted_folder, "assets")
+            dst_assets = os.path.join(os.getcwd(), "assets")
 
-            for item in os.listdir(extracted_folder):
-                if item in ["data", "assets", ".git", "venv", "__pycache__"]:
-                    continue # Jangan hapus database dan aset gambar
+            if os.path.exists(src_assets):
+                shutil.copytree(src_assets, dst_assets, dirs_exist_ok=True)
 
-                s = os.path.join(extracted_folder, item)
-                d = os.path.join(os.getcwd(), item)
-
-                if os.path.isdir(s):
-                    shutil.copytree(s, d, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(s, d)
-
-            # 6. Simpan SHA baru
+            # 6. Simpan SHA aset yang baru
+            os.makedirs(os.path.dirname(VERSION_FILE), exist_ok=True)
             with open(VERSION_FILE, "w") as f:
                 f.write(latest_sha)
 
             shutil.rmtree(temp_dir)
-            self.update_finished.emit(True, "Update Downloaded! Application need to be restarted.")
+            self.update_finished.emit(True, "Assets had been updated!")
 
         except Exception as e:
-            self.update_finished.emit(False, f"Failed check update: {e}")
+            self.update_finished.emit(False, f"Failed to update: {e}")
