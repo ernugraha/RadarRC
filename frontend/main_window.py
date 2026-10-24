@@ -23,8 +23,6 @@ from backend.settings_manager import SettingsManager
 from backend.updater import AutoUpdater
 from backend.flight_plan_store import FlightPlanStore
 
-# ================= KOORDINAT BANDARA (DIKUNCI) =================
-# Angka dari user. Akan dibagi 100 di dalam setup_map untuk disesuaikan dengan skala peta.
 AIRPORT_COORDS = {
     "IRFD": {"x": -2906.170327039993, "y": 21381.94313216},
     "IPPH": {"x": 18155.776, "y": -19415.616},
@@ -251,7 +249,6 @@ class MainWindow(QMainWindow):
             plane.always_show_label = self.show_all_labels
             plane.update()
 
-        # Toggle Pin Bandara
         for airport in self.airport_items.values():
             airport.setVisible(self.show_airports)
 
@@ -297,14 +294,10 @@ class MainWindow(QMainWindow):
             self.boundaries_item.setVisible(self.show_boundaries)
             self.scene.addItem(self.boundaries_item)
 
-        # LOAD PIN BANDARA HARDCODE
         for icao, coords in AIRPORT_COORDS.items():
             name = get_airport_name(icao)
             item = AirportItem(icao, name)
-
-            # KUNCI PERBAIKAN: Bagi 100 agar skalanya pas dengan peta (1px = 100 studs)
             item.setPos(coords["x"] / 100.0, coords["y"] / 100.0)
-
             item.setVisible(self.show_airports)
             self.scene.addItem(item)
             self.airport_items[icao] = item
