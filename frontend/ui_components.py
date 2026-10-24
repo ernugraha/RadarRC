@@ -7,67 +7,54 @@ from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QPen, QColor
 from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao
+from frontend.airports import get_airport_name # <-- IMPORT NAMA BANDARA
 
 def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
-    if not os.path.exists(photo_dir):
-        return None
-
+    if not os.path.exists(photo_dir): return None
     at_lower = aircraft_type.lower()
     ac_clean = at_lower.replace(" ", "").replace("-", "")
     nums = ''.join(re.findall(r'\d+', ac_clean))
-
     model_candidates = set()
     if nums:
         model_candidates.add(nums)
         if "boeing" in at_lower: model_candidates.add(f"b{nums}")
         if "airbus" in at_lower: model_candidates.add(f"a{nums}")
-    if ac_clean:
-        model_candidates.add(ac_clean)
-
+    if ac_clean: model_candidates.add(ac_clean)
     airline_keys = get_airline_keys(callsign)
     airline_keys.extend(["generic", "default", callsign.lower()])
-
     candidates = []
     for model in model_candidates:
         for akey in airline_keys:
             candidates.append(f"{model}_{akey}.png")
             candidates.append(f"{akey}_{model}.png")
-
     candidates.extend([f"{m}.png" for m in model_candidates])
     candidates.extend([f"{a}.png" for a in airline_keys])
 
     for name in candidates:
         path = os.path.join(photo_dir, name)
-        if os.path.isfile(path):
-            return path
+        if os.path.isfile(path): return path
     return None
 
 class TopBar(QWidget):
     search_triggered = Signal(str)
-
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 0)
         logo = QLabel("RadarRC")
         logo.setObjectName("AppLogo")
-
         self.search_bar = QLineEdit()
         self.search_bar.setObjectName("SearchBar")
         self.search_bar.setPlaceholderText("Find flights (e.g., BAW123, PilotName)... (Press Enter)")
         self.search_bar.setFixedWidth(450)
         self.search_bar.returnPressed.connect(self.on_search_enter)
-
         layout.addWidget(logo)
         layout.addStretch()
         layout.addWidget(self.search_bar)
         layout.addStretch()
-        # Tombol sudah dihapus total dari sini
-
     def on_search_enter(self):
         query = self.search_bar.text().strip()
-        if query:
-            self.search_triggered.emit(query)
+        if query: self.search_triggered.emit(query)
 
 class FlightPanel(QFrame):
     clicked = Signal(str)
@@ -77,53 +64,55 @@ class FlightPanel(QFrame):
         self.setFixedHeight(65)
         self.setCursor(Qt.PointingHandCursor)
         self.original_callsign = ""
-
         p_layout = QVBoxLayout(self)
         p_layout.setContentsMargins(10, 8, 10, 8)
         p_layout.setSpacing(2)
-
         row1 = QHBoxLayout()
+        row1.setSpacing(5)
         self.lbl_callsign = QLabel("CALLSIGN")
         self.lbl_callsign.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
         self.lbl_callsign.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-
         self.lbl_type = QLabel("TYPE")
-        self.lbl_type.setStyleSheet("color: #aaa; font-size: 11px; font-weight: bold; margin-left: 5px;")
+        self.lbl_type.setStyleSheet("color: #aaa; font-size: 11px; font-weight: bold;")
         self.lbl_type.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-
         self.lbl_speed = QLabel("0 kts")
         self.lbl_speed.setObjectName("AccentText")
-
-        row1.addWidget(self.lbl_callsign, 1)
-        row1.addWidget(self.lbl_type, 1)
+        row1.addWidget(self.lbl_callsign, 3)
+        row1.addWidget(self.lbl_type, 2)
         row1.addWidget(self.lbl_speed)
-
         self.lbl_route = QLabel("N/A - N/A")
         self.lbl_route.setObjectName("SubText")
-
         p_layout.addLayout(row1)
         p_layout.addWidget(self.lbl_route)
 
     def set_data(self, callsign, info):
         self.original_callsign = callsign
-
         icao = get_airline_icao(callsign)
         parts = callsign.split("-")
         flight_num = parts[-1] if len(parts) > 1 else ""
-
-        if icao != "???":
-            display_name = f"{icao}{flight_num}"
-        else:
-            display_name = parts[0]
-
+        display_name = f"{icao}{flight_num}" if icao != "???" else parts[0]
         self.lbl_callsign.setText(display_name)
-        self.lbl_type.setText(info.get("aircraftType", "Unknown").upper())
+
+        ac_type = info.get("aircraftType", "Unknown").upper()
+        if len(ac_type) > 12: ac_type = ac_type[:10] + "..."
+        self.lbl_type.setText(ac_type)
         self.lbl_speed.setText(f"{int(info.get('speed', 0))} kts")
-        self.lbl_route.setText(f"{info.get('plan_departing', 'N/A')} - {info.get('plan_arriving', 'N/A')}")
+
+        # Di sidebar, kita gabungkan kode dan nama (misal: IRFD - Greater Rockford)
+        dep_code = info.get("plan_departing", "")
+        arr_code = info.get("plan_arriving", "")
+
+        dep_name = get_airport_name(dep_code) if dep_code else "N/A"
+        arr_name = get_airport_name(arr_code) if arr_code else "N/A"
+
+        # Jika nama terlalu panjang, potong
+        if len(dep_name) > 15: dep_name = dep_name[:13] + ".."
+        if len(arr_name) > 15: arr_name = arr_name[:13] + ".."
+
+        self.lbl_route.setText(f"{dep_code} {dep_name} - {arr_code} {arr_name}" if dep_code else "N/A - N/A")
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.original_callsign)
+        if event.button() == Qt.LeftButton: self.clicked.emit(self.original_callsign)
         super().mousePressEvent(event)
 
 class Sidebar(QFrame):
@@ -133,23 +122,19 @@ class Sidebar(QFrame):
         self.setObjectName("Sidebar")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
-
         header = QLabel("Current Flights")
         header.setObjectName("HeaderText")
         layout.addWidget(header)
-
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("background: transparent;")
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
         self.list_widget = QWidget()
         self.list_widget.setStyleSheet("background: transparent;")
         self.list_layout = QVBoxLayout(self.list_widget)
         self.list_layout.setContentsMargins(0, 0, 0, 0)
         self.list_layout.setSpacing(8)
         self.list_layout.setAlignment(Qt.AlignTop)
-
         self.panels = []
         for _ in range(30):
             p = FlightPanel()
@@ -157,10 +142,8 @@ class Sidebar(QFrame):
             self.panels.append(p)
             self.list_layout.addWidget(p)
             p.hide()
-
         self.scroll_area.setWidget(self.list_widget)
         layout.addWidget(self.scroll_area)
-
     def update_data(self, data_dict):
         sorted_data = sorted(data_dict.items(), key=lambda x: x[1].get("altitude", 0), reverse=True)
         for i, panel in enumerate(self.panels):
@@ -168,117 +151,120 @@ class Sidebar(QFrame):
                 callsign, info = sorted_data[i]
                 panel.set_data(callsign, info)
                 panel.show()
-            else:
-                panel.hide()
+            else: panel.hide()
 
 class FlightInfoPanel(QFrame):
     closed = Signal()
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("InfoPanel")
         self.setVisible(False)
-
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # HEADER
         header_frame = QFrame()
         header_frame.setStyleSheet("background-color: #242424; border-top-left-radius: 12px; border-top-right-radius: 12px;")
         header_layout = QVBoxLayout(header_frame)
         header_layout.setContentsMargins(15, 15, 15, 15)
-
         row1 = QHBoxLayout()
         self.lbl_callsign = QLabel("CALLSIGN")
         self.lbl_callsign.setObjectName("InfoCallsign")
         self.lbl_badge = QLabel("TYPE")
         self.lbl_badge.setObjectName("InfoBadge")
-
         btn_close = QPushButton("X")
         btn_close.setFixedSize(25, 25)
         btn_close.setStyleSheet("background: #333; color: white; border-radius: 12px; font-weight: bold;")
         btn_close.clicked.connect(self.closed.emit)
-
         row1.addWidget(self.lbl_callsign)
         row1.addWidget(self.lbl_badge)
         row1.addStretch()
         row1.addWidget(btn_close)
-
         self.lbl_airline = QLabel("Airline Name")
         self.lbl_airline.setObjectName("InfoAirline")
-
         header_layout.addLayout(row1)
         header_layout.addWidget(self.lbl_airline)
         main_layout.addWidget(header_frame)
 
-        # PHOTO
         photo_frame = QFrame()
         photo_layout = QVBoxLayout(photo_frame)
         photo_layout.setContentsMargins(15, 15, 15, 0)
-
         self.photo_box = QLabel("?")
         self.photo_box.setObjectName("PhotoBox")
         self.photo_box.setFixedHeight(180)
         self.photo_box.setAlignment(Qt.AlignCenter)
-
         photo_layout.addWidget(self.photo_box)
         main_layout.addWidget(photo_frame)
 
-        # ROUTE
+        # ROUTE SECTION (KODE GEDE, NAMA KECIL DI BAWAH)
         route_frame = QFrame()
         route_layout = QHBoxLayout(route_frame)
         route_layout.setContentsMargins(15, 15, 15, 15)
+        route_layout.setSpacing(10)
 
-        self.lbl_dep = QLabel("N/A")
-        self.lbl_dep.setObjectName("RouteCode")
+        # Sisi Kiri (Departure)
+        dep_layout = QVBoxLayout()
+        dep_layout.setSpacing(0)
+        self.lbl_dep = QLabel("???")
+        self.lbl_dep.setObjectName("RouteCode") # CSS mengatur ini jadi besar
         self.lbl_dep.setAlignment(Qt.AlignCenter)
 
+        self.lbl_dep_name = QLabel("")
+        self.lbl_dep_name.setStyleSheet("color: #888; font-size: 10px; font-weight: bold;")
+        self.lbl_dep_name.setAlignment(Qt.AlignCenter)
+
+        dep_layout.addWidget(self.lbl_dep)
+        dep_layout.addWidget(self.lbl_dep_name)
+
+        # Tengah (Panah)
         arrow = QLabel("➔")
         arrow.setStyleSheet("color: #f4b400; font-size: 20px;")
+        arrow.setAlignment(Qt.AlignCenter)
 
-        self.lbl_arr = QLabel("N/A")
+        # Sisi Kanan (Arrival)
+        arr_layout = QVBoxLayout()
+        arr_layout.setSpacing(0)
+        self.lbl_arr = QLabel("???")
         self.lbl_arr.setObjectName("RouteCode")
         self.lbl_arr.setAlignment(Qt.AlignCenter)
 
-        route_layout.addWidget(self.lbl_dep, 1)
+        self.lbl_arr_name = QLabel("")
+        self.lbl_arr_name.setStyleSheet("color: #888; font-size: 10px; font-weight: bold;")
+        self.lbl_arr_name.setAlignment(Qt.AlignCenter)
+
+        arr_layout.addWidget(self.lbl_arr)
+        arr_layout.addWidget(self.lbl_arr_name)
+
+        route_layout.addLayout(dep_layout, 1)
         route_layout.addWidget(arrow)
-        route_layout.addWidget(self.lbl_arr, 1)
+        route_layout.addLayout(arr_layout, 1)
+
         main_layout.addWidget(route_frame)
 
-        # TELEMETRY
         telemetry_frame = QFrame()
         tele_layout = QGridLayout(telemetry_frame)
         tele_layout.setContentsMargins(15, 5, 15, 15)
         tele_layout.setSpacing(10)
-
         self.val_alt = self.create_telemetry_box(tele_layout, 0, 0, "ALTITUDE")
         self.val_spd = self.create_telemetry_box(tele_layout, 0, 1, "SPEED")
         self.val_hdg = self.create_telemetry_box(tele_layout, 1, 0, "HEADING")
         self.val_vs  = self.create_telemetry_box(tele_layout, 1, 1, "V/SPEED")
-
         main_layout.addWidget(telemetry_frame)
 
-        # PILOT
         pilot_frame = QFrame()
         pilot_frame.setStyleSheet("background-color: #111; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
         pilot_layout = QVBoxLayout(pilot_frame)
         pilot_layout.setContentsMargins(15, 10, 15, 15)
-
         lbl_p = QLabel("PILOT / USERNAME (Click to copy)")
         lbl_p.setObjectName("DataLabel")
-
         self.btn_pilot = QPushButton("Unknown")
         self.btn_pilot.setObjectName("CopyBtn")
         self.btn_pilot.setCursor(Qt.PointingHandCursor)
         self.btn_pilot.clicked.connect(self.copy_username)
-
         pilot_layout.addWidget(lbl_p)
         pilot_layout.addWidget(self.btn_pilot)
-
         main_layout.addWidget(pilot_frame)
         main_layout.addStretch()
-
         self.current_pilot_name = "Unknown"
 
     def create_telemetry_box(self, layout, row, col, title):
@@ -303,26 +289,31 @@ class FlightInfoPanel(QFrame):
 
     def set_flight_data(self, callsign, info):
         real_airline = get_airline_name(callsign)
-
         self.lbl_callsign.setText(callsign)
         self.lbl_badge.setText(info.get("aircraftType", "Unknown").upper())
         self.lbl_airline.setText(real_airline)
 
-        dep = info.get("plan_departing", "N/A")
-        arr = info.get("plan_arriving", "N/A")
-        self.lbl_dep.setText(dep if dep else "???")
-        self.lbl_arr.setText(arr if arr else "???")
+        dep_code = info.get("plan_departing", "")
+        arr_code = info.get("plan_arriving", "")
+
+        # Kode Besar
+        self.lbl_dep.setText(dep_code if dep_code else "???")
+        self.lbl_arr.setText(arr_code if arr_code else "???")
+
+        # Nama Bandara (Teks Kecil di bawah)
+        dep_name = get_airport_name(dep_code) if dep_code else ""
+        arr_name = get_airport_name(arr_code) if arr_code else ""
+        self.lbl_dep_name.setText(dep_name.upper())
+        self.lbl_arr_name.setText(arr_name.upper())
 
         self.val_alt.setText(f"{int(info.get('altitude', 0)):,} ft")
         self.val_spd.setText(f"{int(info.get('speed', 0))} kts")
         self.val_hdg.setText(f"{int(info.get('heading', 0))}°")
         self.val_vs.setText("0 ft/m")
-
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
         photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
-
         if photo_path:
             pixmap = QPixmap(photo_path)
             if not pixmap.isNull():
@@ -330,31 +321,23 @@ class FlightInfoPanel(QFrame):
                 zoom_factor = 1.25
                 scale_w = int(target_w * zoom_factor)
                 scale_h = int(target_h * zoom_factor)
-
                 scaled = pixmap.scaled(scale_w, scale_h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
                 x_offset = (scaled.width() - target_w) // 2
                 y_offset = (scaled.height() - target_h) // 2
                 cropped = scaled.copy(x_offset, y_offset, target_w, target_h)
-
                 rounded_pixmap = QPixmap(target_w, target_h)
                 rounded_pixmap.fill(Qt.transparent)
-
                 painter = QPainter(rounded_pixmap)
                 painter.setRenderHint(QPainter.Antialiasing)
-
                 path = QPainterPath()
                 path.addRoundedRect(QRectF(0, 0, target_w, target_h), 6, 6)
-
                 painter.setClipPath(path)
                 painter.drawPixmap(0, 0, cropped)
-
                 pen = QPen(QColor("#444"))
                 pen.setWidth(1)
                 painter.setPen(pen)
                 painter.drawPath(path)
-
                 painter.end()
-
                 self.photo_box.setPixmap(rounded_pixmap)
                 self.photo_box.setText("")
                 self.photo_box.setStyleSheet("background-color: transparent; border: none;")
