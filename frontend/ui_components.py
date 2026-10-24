@@ -9,6 +9,8 @@ from PySide6.QtGui import QPixmap
 from frontend.airlines import get_airline_name, get_airline_keys
 
 def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
+    if not os.path.exists(photo_dir):
+        return None
 
     at_lower = aircraft_type.lower()
     ac_clean = at_lower.replace(" ", "").replace("-", "")
@@ -179,14 +181,14 @@ class FlightInfoPanel(QFrame):
         header_layout.addWidget(self.lbl_airline)
         main_layout.addWidget(header_frame)
 
-        # ================= PHOTO PLACEHOLDER (DIPERPANJANG) =================
+        # ================= PHOTO PLACEHOLDER =================
         photo_frame = QFrame()
         photo_layout = QVBoxLayout(photo_frame)
         photo_layout.setContentsMargins(15, 15, 15, 0)
 
         self.photo_box = QLabel("?")
         self.photo_box.setObjectName("PhotoBox")
-        self.photo_box.setFixedHeight(180) # <-- DIPERPANJANG DARI 120 KE 180
+        self.photo_box.setFixedHeight(180)
         self.photo_box.setAlignment(Qt.AlignCenter)
 
         photo_layout.addWidget(self.photo_box)
@@ -288,25 +290,29 @@ class FlightInfoPanel(QFrame):
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
-        # ================= LOGIKA LOAD FOTO (ANTI BLACK BAR) =================
+        # ================= LOGIKA LOAD FOTO (ZOOM 125%) =================
         photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
 
         if photo_path:
             pixmap = QPixmap(photo_path)
             if not pixmap.isNull():
-                target_w, target_h = 310, 180 # Lebar panel dikurangi margin (340 - 30 = 310)
+                target_w, target_h = 310, 180
 
-                # 1. Perbesar gambar agar menutupi seluruh kotak (KeepAspectRatioByExpanding)
-                scaled = pixmap.scaled(target_w, target_h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                # KUNCI ZOOM 125%: Perbesar target scaling sebelum dipotong
+                zoom_factor = 1.25
+                scale_w = int(target_w * zoom_factor)
+                scale_h = int(target_h * zoom_factor)
 
-                # 2. Potong bagian tengahnya (Center-Crop)
+                # 1. Perbesar gambar agar menutupi area yang lebih besar
+                scaled = pixmap.scaled(scale_w, scale_h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+
+                # 2. Potong bagian tengahnya tepat seukuran kotak asli (310x180)
                 x_offset = (scaled.width() - target_w) // 2
                 y_offset = (scaled.height() - target_h) // 2
                 cropped = scaled.copy(x_offset, y_offset, target_w, target_h)
 
                 self.photo_box.setPixmap(cropped)
                 self.photo_box.setText("")
-                # Pastikan style background hitam & border rounded tetap ada
                 self.photo_box.setStyleSheet("background-color: #000; border: 1px solid #444; border-radius: 6px;")
             else:
                 self.photo_box.clear()
