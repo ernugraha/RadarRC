@@ -13,16 +13,6 @@ class FlightPlanStore:
 
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:
-            # Cek apakah tabel lama ada dan menggunakan skema lama (callsign)
-            try:
-                cursor = conn.execute("PRAGMA table_info(plans)")
-                columns = [col[1] for col in cursor.fetchall()]
-                if columns and "roblox_name" not in columns:
-                    conn.execute("DROP TABLE plans")
-            except Exception:
-                pass
-
-            # Buat tabel baru HANYA JIKA BELUM ADA
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS plans (
                     roblox_name TEXT PRIMARY KEY,
@@ -35,22 +25,25 @@ class FlightPlanStore:
                     trail_data TEXT
                 )
             """)
+            # TABEL BARU UNTUK BANDARA
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS airport_data (
+                    icao TEXT PRIMARY KEY,
+                    data TEXT
+                )
+            """)
             conn.commit()
 
-    # --- FLIGHT PLAN (BERDASARKAN USERNAME) ---
+    # --- FLIGHT PLAN ---
     def save_plan(self, roblox_name, plan_data):
         if not roblox_name: return
         try:
             r_name_lower = roblox_name.lower()
             plan_data["_saved_at"] = time.time()
-
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute("INSERT OR REPLACE INTO plans (roblox_name, plan_data) VALUES (?, ?)",
-                             (r_name_lower, json.dumps(plan_data)))
+                conn.execute("INSERT OR REPLACE INTO plans (roblox_name, plan_data) VALUES (?, ?)", (r_name_lower, json.dumps(plan_data)))
                 conn.commit()
-            print(f"[DATABASE] Plan saved for: {r_name_lower}")
-        except Exception as e:
-            print(f"[DATABASE ERROR] Gagal simpan plan: {e}")
+        except: pass
 
     def get_plan(self, roblox_name):
         if not roblox_name: return None
@@ -58,10 +51,8 @@ class FlightPlanStore:
             r_name_lower = roblox_name.lower()
             with sqlite3.connect(self.db_path) as conn:
                 row = conn.execute("SELECT plan_data FROM plans WHERE roblox_name = ?", (r_name_lower,)).fetchone()
-                if row:
-                    return json.loads(row[0])
-        except Exception as e:
-            print(f"[DATABASE ERROR] Gagal ambil plan: {e}")
+                if row: return json.loads(row[0])
+        except: pass
         return None
 
     # --- TRAILS ---
@@ -79,6 +70,21 @@ class FlightPlanStore:
             if row: return json.loads(row[0])
         return []
 
+    # --- AIRPORT DATA (BARU) ---
+    def save_airport_data(self, icao, data_dict):
+        if not icao: return
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("INSERT OR REPLACE INTO airport_data (icao, data) VALUES (?, ?)", (icao, json.dumps(data_dict)))
+                conn.commit()
+        except: pass
+
+    def get_airport_data(self, icao):
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute("SELECT data FROM airport_data WHERE icao = ?", (icao,)).fetchone()
+            if row: return json.loads(row[0])
+        return {}
+
     # --- CLEANUP ---
     def cleanup_stale_data(self, active_usernames, active_callsigns):
         if not active_usernames or not active_callsigns: return
@@ -91,7 +97,7 @@ class FlightPlanStore:
             for r_name, plan_json in all_plans:
                 if r_name not in active_names_lower:
                     plan = json.loads(plan_json)
-                    if now - plan.get("_saved_at", 0) > 7200: # Hapus jika > 2 jam
+                    if now - plan.get("_saved_at", 0) > 7200:
                         to_del_plans.append(r_name)
 
             if to_del_plans:

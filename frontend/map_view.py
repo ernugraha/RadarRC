@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, Signal, QVariantAnimation, QEasingCurve, QPointF
 from PySide6.QtGui import QPainter
 
 class MapView(QGraphicsView):
-    user_panned = Signal() # <-- Sinyal saat peta digeser manual
+    user_panned = Signal()
 
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
@@ -20,19 +20,22 @@ class MapView(QGraphicsView):
 
         self.anim_center = None
 
+    def set_calibration_mode(self, enabled):
+        """Memungkinkan drag pada item (bandara) saat kalibrasi."""
+        if enabled:
+            self.setDragMode(QGraphicsView.NoDrag) # Matikan pan peta
+        else:
+            self.setDragMode(QGraphicsView.ScrollHandDrag) # Nyalakan pan peta
+
     def mouseMoveEvent(self, event):
-        # Jika tombol kiri ditekan dan digeser, berarti user melakukan manual pan
-        if event.buttons() & Qt.LeftButton:
+        if event.buttons() & Qt.LeftButton and self.dragMode() == QGraphicsView.ScrollHandDrag:
             self.user_panned.emit()
         super().mouseMoveEvent(event)
 
     def smooth_center_on(self, target_pos):
-        """Animasi meluncur ke posisi target."""
         if self.anim_center:
             self.anim_center.stop()
-
         start_pos = self.mapToScene(self.viewport().rect().center())
-
         self.anim_center = QVariantAnimation(self)
         self.anim_center.setStartValue(start_pos)
         self.anim_center.setEndValue(target_pos)
@@ -60,13 +63,8 @@ class MapView(QGraphicsView):
         h_bar = self.horizontalScrollBar()
         v_bar = self.verticalScrollBar()
 
-        if event.key() == Qt.Key_Left:
-            h_bar.setValue(h_bar.value() - step)
-        elif event.key() == Qt.Key_Right:
-            h_bar.setValue(h_bar.value() + step)
-        elif event.key() == Qt.Key_Up:
-            v_bar.setValue(v_bar.value() - step)
-        elif event.key() == Qt.Key_Down:
-            v_bar.setValue(v_bar.value() + step)
-        else:
-            super().keyPressEvent(event)
+        if event.key() == Qt.Key_Left: h_bar.setValue(h_bar.value() - step)
+        elif event.key() == Qt.Key_Right: h_bar.setValue(h_bar.value() + step)
+        elif event.key() == Qt.Key_Up: v_bar.setValue(v_bar.value() - step)
+        elif event.key() == Qt.Key_Down: v_bar.setValue(v_bar.value() + step)
+        else: super().keyPressEvent(event)

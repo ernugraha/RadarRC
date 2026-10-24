@@ -10,7 +10,7 @@ _SVG_CACHE = {}
 
 def load_icons(icons_dir="assets/planes"):
     if not os.path.exists(icons_dir):
-        print(f"[WARNING] Folder ikon tidak ditemukan: {icons_dir}")
+        print(f"[WARNING] Cannot find: {icons_dir}")
         return
     for filename in os.listdir(icons_dir):
         if filename.endswith(".svg"):
@@ -18,7 +18,7 @@ def load_icons(icons_dir="assets/planes"):
             renderer = QSvgRenderer(os.path.join(icons_dir, filename))
             if renderer.isValid():
                 _SVG_CACHE[name] = renderer
-    print(f"[INFO] Berhasil memuat {len(_SVG_CACHE)} ikon pesawat dari FlightEye.")
+    print(f"[INFO] Loaded {len(_SVG_CACHE)} aircraft icon.")
 
 # KAMUS LENGKAP: Mencakup semua file yang sudah Anda unduh
 AIRCRAFT_MAPPING = {
@@ -230,3 +230,39 @@ class TrailItem(QGraphicsItem):
                 rat = (alt - a1) / (a2 - a1)
                 return QColor(int(r1+(r2-r1)*rat), int(g1+(g2-g1)*rat), int(b1+(b2-b1)*rat))
         return QColor(255,255,255)
+
+
+class AirportItem(QGraphicsItem):
+    def __init__(self, icao, name):
+        super().__init__()
+        self.icao = icao
+        self.name = name
+        self.size = 14
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+        self.setZValue(0.5)
+
+        # Flag untuk drag (kalibrasi)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
+
+    def boundingRect(self):
+        return QRectF(-self.size, -self.size, self.size * 2, self.size * 2)
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Warna Biru
+        painter.setBrush(QBrush(QColor("#1d4ed8")))
+        painter.setPen(QPen(Qt.white, 2))
+        painter.drawEllipse(-self.size/2, -self.size/2, self.size, self.size)
+
+        # Teks "T"
+        painter.setPen(QPen(Qt.white))
+        font = QFont("Arial", 8, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(QRectF(-self.size/2, -self.size/2, self.size, self.size), Qt.AlignCenter, "T")
+
+        if self.isSelected():
+            painter.setPen(QPen(QColor("#f4b400"), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(-self.size/2 - 2, -self.size/2 - 2, self.size + 4, self.size + 4)

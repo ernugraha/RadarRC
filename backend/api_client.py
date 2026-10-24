@@ -21,6 +21,7 @@ class DataClient(QObject):
         self._last_cleanup_time = 0
 
     def process_aircraft(self, payload):
+        # ... (Sama seperti sebelumnya)
         if not isinstance(payload, dict): return {}
         result = {}
         active_callsigns = set()
@@ -28,11 +29,9 @@ class DataClient(QObject):
 
         for callsign, ac in payload.items():
             if not isinstance(ac, dict): continue
-
             active_callsigns.add(callsign)
             player_name = ac.get("playerName", "")
-            if player_name:
-                active_usernames.add(player_name)
+            if player_name: active_usernames.add(player_name)
 
             pos = ac.get("position", {})
             entry = {
@@ -42,7 +41,6 @@ class DataClient(QObject):
                 "speed": float(ac.get("speed", 0)), "isOnGround": bool(ac.get("isOnGround", False)),
             }
 
-            # COCOKKAN FLIGHT PLAN BERDASARKAN USERNAME
             if player_name:
                 plan = self.plan_store.get_plan(player_name)
                 if plan:
@@ -61,7 +59,6 @@ class DataClient(QObject):
 
     async def connect(self):
         self.is_running = True
-
         while self.is_running:
             self.connection_status.emit("[INFO] Connecting to 24Data API...")
             try:
@@ -83,13 +80,7 @@ class DataClient(QObject):
                                 plan_data = data.get("d", {})
                                 roblox_name = plan_data.get("robloxName")
                                 if roblox_name:
-                                    # Simpan ke DB
                                     self.plan_store.save_plan(roblox_name, plan_data)
-                                    dep = plan_data.get("departing", "N/A")
-                                    arr = plan_data.get("arriving", "N/A")
-                                    print(f"[FLIGHT PLAN RECEIVED] {roblox_name} -> {dep} to {arr}")
-                                else:
-                                    print(f"[FLIGHT PLAN WARNING] No username detected: {plan_data}")
 
                             elif event_type == "CONTROLLERS":
                                 controllers = data.get("d", [])
@@ -97,16 +88,30 @@ class DataClient(QObject):
                                 for c in controllers:
                                     if c.get("holder"):
                                         apt = c.get("airport")
-                                        pos = c.get("position")
+                                        pos = c.get("position") # GND, TWR, CTR
                                         if apt not in parsed: parsed[apt] = {}
                                         parsed[apt][pos] = c.get("holder")
+
+                                # Simpan ke DB berdasarkan bandara
+                                for apt, atc_info in parsed.items():
+                                    existing = self.plan_store.get_airport_data(apt)
+                                    existing["atc"] = atc_info
+                                    self.plan_store.save_airport_data(apt, existing)
+
                                 self.controllers_data_received.emit(parsed)
 
                             elif event_type == "ATIS":
                                 atis_list = data.get("d", [])
                                 parsed_atis = {}
                                 for a in atis_list:
-                                    parsed_atis[a.get("airport")] = a
+                                    apt = a.get("airport")
+                                    parsed_atis[apt] = a
+
+                                    # Simpan ke DB berdasarkan bandara
+                                    existing = self.plan_store.get_airport_data(apt)
+                                    existing["atis"] = a
+                                    self.plan_store.save_airport_data(apt, existing)
+
                                 self.atis_data_received.emit(parsed_atis)
 
                         except websockets.exceptions.ConnectionClosed:
