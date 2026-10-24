@@ -13,10 +13,17 @@ class FlightPlanStore:
 
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:
-            # Hapus tabel lama agar skema baru (berdasarkan username) bisa dibuat
-            conn.execute("DROP TABLE IF EXISTS plans")
+            # Cek apakah tabel lama ada dan menggunakan skema lama (callsign)
+            try:
+                cursor = conn.execute("PRAGMA table_info(plans)")
+                columns = [col[1] for col in cursor.fetchall()]
+                if columns and "roblox_name" not in columns:
+                    print("[DATABASE] Skema lama terdeteksi. Memperbarui tabel plans...")
+                    conn.execute("DROP TABLE plans")
+            except Exception:
+                pass
 
-            # Buat tabel baru berdasarkan username
+            # Buat tabel baru HANYA JIKA BELUM ADA
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS plans (
                     roblox_name TEXT PRIMARY KEY,
@@ -35,7 +42,6 @@ class FlightPlanStore:
     def save_plan(self, roblox_name, plan_data):
         if not roblox_name: return
         try:
-            # Paksa huruf kecil untuk konsistensi
             r_name_lower = roblox_name.lower()
             plan_data["_saved_at"] = time.time()
 
@@ -86,8 +92,7 @@ class FlightPlanStore:
             for r_name, plan_json in all_plans:
                 if r_name not in active_names_lower:
                     plan = json.loads(plan_json)
-                    # Hapus jika umur plan > 2 jam
-                    if now - plan.get("_saved_at", 0) > 7200:
+                    if now - plan.get("_saved_at", 0) > 7200: # Hapus jika > 2 jam
                         to_del_plans.append(r_name)
 
             if to_del_plans:
