@@ -21,8 +21,6 @@ class MainWindow(QMainWindow):
         load_icons("assets/icons")
         self.aircraft_items = {}
         self.current_data = {}
-
-        # Timer untuk membatasi update Sidebar (Anti Lag)
         self.last_sidebar_update = 0
 
         self.scene = QGraphicsScene()
@@ -32,20 +30,24 @@ class MainWindow(QMainWindow):
 
         self.setup_map()
 
-        # UI Components
         self.top_bar = TopBar(self.view)
         self.sidebar = Sidebar(self.view)
         self.info_panel = FlightInfoPanel(self.view)
         self.map_controls = MapControls(self.view, self.view)
         self.bottom_toolbar = BottomToolbar(self.view)
 
-        # Hubungkan tombol close di Info Panel
         self.info_panel.closed.connect(self.close_info_panel)
-
-        # Deteksi klik pada pesawat di peta
         self.scene.selectionChanged.connect(self.on_aircraft_selected)
 
-        # Inisialisasi posisi UI (awal)
+        # Siapkan Animasi (Simpan sebagai self agar tidak dihapus memori)
+        self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
+        self.sidebar_anim.setDuration(300)
+        self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
+
+        self.info_anim = QPropertyAnimation(self.info_panel, b"geometry")
+        self.info_anim.setDuration(300)
+        self.info_anim.setEasingCurve(QEasingCurve.OutCubic)
+
         self.resizeEvent(None)
         self.sidebar.show()
         self.info_panel.hide()
@@ -55,9 +57,10 @@ class MainWindow(QMainWindow):
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
 
-        # Posisi normal Sidebar & InfoPanel
-        self.sidebar.setGeometry(20, 100, 320, 500)
-        self.info_panel.setGeometry(-340, 100, 320, 500) # Sembunyi di kiri
+        # Sesuaikan tinggi sidebar dengan layar
+        panel_height = h - 200
+        self.sidebar.setGeometry(20, 100, 340, panel_height)
+        self.info_panel.setGeometry(-360, 100, 340, panel_height) # Sembunyi di kiri
 
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
         tb_w = 500
@@ -66,9 +69,7 @@ class MainWindow(QMainWindow):
     def setup_map(self):
         self.scene.setBackgroundBrush(QColor("#131313"))
         map_path = "assets/maps/full_map_small.png"
-
-        if not os.path.exists(map_path):
-            return
+        if not os.path.exists(map_path): return
 
         pixmap = QPixmap(map_path)
         self.map_item = QGraphicsPixmapItem(pixmap)
@@ -91,11 +92,8 @@ class MainWindow(QMainWindow):
         self.view.scale(0.5, 0.5)
 
     def on_aircraft_selected(self):
-        """Dipicu saat pesawat di peta diklik."""
         selected_items = self.scene.selectedItems()
-
         if selected_items:
-            # Ambil pesawat pertama yang dipilih
             item = selected_items[0]
             if isinstance(item, AircraftItem):
                 callsign = item.callsign
@@ -103,48 +101,37 @@ class MainWindow(QMainWindow):
                     self.info_panel.set_flight_data(callsign, self.current_data[callsign])
                     self.animate_panels(show_info=True)
         else:
-            # Jika klik di area kosong (tidak ada pesawat terpilih)
             self.animate_panels(show_info=False)
 
     def close_info_panel(self):
-        """Dipicu saat tombol X di info panel diklik."""
-        self.scene.clearSelection() # Ini otomatis memicu on_aircraft_selected
+        self.scene.clearSelection()
 
     def animate_panels(self, show_info):
-        """Animasi geser (Slide) untuk Sidebar dan Info Panel."""
-        # Hentikan animasi jika masih berjalan
-        if hasattr(self, 'sidebar_anim'): self.sidebar_anim.stop()
-        if hasattr(self, 'info_anim'): self.info_anim.stop()
+        # Hentikan animasi yang sedang berjalan
+        self.sidebar_anim.stop()
+        self.info_anim.stop()
 
-        self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
-        self.sidebar_anim.setDuration(250)
-        self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
-
-        self.info_anim = QPropertyAnimation(self.info_panel, b"geometry")
-        self.info_anim.setDuration(250)
-        self.info_anim.setEasingCurve(QEasingCurve.OutCubic)
+        w = self.width()
+        h = self.height()
+        panel_height = h - 200
 
         if show_info:
             self.info_panel.show()
-            # Sidebar keluar ke kiri, Info Panel masuk dari kiri
-            self.sidebar_anim.setEndValue(QRect(-340, 100, 320, 500))
-            self.info_anim.setEndValue(QRect(20, 100, 320, 500))
+            self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+            self.info_anim.setEndValue(QRect(20, 100, 340, panel_height))
         else:
-            # Sidebar masuk dari kiri, Info Panel keluar ke kiri
-            self.sidebar_anim.setEndValue(QRect(20, 100, 320, 500))
-            self.info_anim.setEndValue(QRect(-340, 100, 320, 500))
+            self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            self.info_anim.setEndValue(QRect(-360, 100, 340, panel_height))
 
         self.sidebar_anim.start()
         self.info_anim.start()
 
     def update_aircraft(self, data_dict):
-        self.current_data = data_dict # Simpan data untuk Info Panel
+        self.current_data = data_dict
 
         for callsign, info in data_dict.items():
-            if "x" not in info or "y" not in info:
-                continue
-            x = info["x"]
-            y = info["y"]
+            if "x" not in info or "y" not in info: continue
+            x, y = info["x"], info["y"]
             heading = info.get("heading", 0)
             ac_type = info.get("aircraftType", "")
 
@@ -155,7 +142,6 @@ class MainWindow(QMainWindow):
 
             self.aircraft_items[callsign].update_data(x, y, heading, ac_type)
 
-        # Update Sidebar hanya setiap 2 detik agar tidak lag
         now = time.time()
         if now - self.last_sidebar_update > 2.0:
             self.sidebar.update_data(data_dict)
