@@ -16,7 +16,7 @@ QFrame#Sidebar {
     border: 1px solid #333;
 }
 
-/* Desain Item Pesawat (Ala FR24) */
+/* Desain Item Pesawat di Sidebar */
 QFrame#FlightPanel {
     background-color: #2b2b2b;
     border-radius: 8px;
@@ -25,24 +25,6 @@ QFrame#FlightPanel {
 QFrame#FlightPanel:hover {
     background-color: #3a3a3a;
     border: 1px solid #f4b400;
-}
-
-/* Badge Kecil (Untuk Tipe Pesawat & Bandara) */
-QLabel#Badge {
-    background-color: #444;
-    color: #aaa;
-    font-size: 10px;
-    font-weight: bold;
-    border-radius: 4px;
-    padding: 2px 6px;
-}
-QLabel#BadgeBlue {
-    background-color: #1d4ed8;
-    color: white;
-    font-size: 10px;
-    font-weight: bold;
-    border-radius: 4px;
-    padding: 2px 6px;
 }
 
 /* --- SCROLLBAR CUSTOM --- */
@@ -142,5 +124,44 @@ QLabel#AccentText {
 QLabel#SubText {
     color: #999;
     font-size: 12px;
+}
+
+/* --- INFO PANEL SPECIFIC --- */
+QFrame#InfoPanel {
+    background-color: #1a1a1a;
+    border-radius: 12px;
+    border: 1px solid #333;
+}
+QLabel#InfoCallsign {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+}
+QLabel#InfoAirline {
+    font-size: 14px;
+    color: #aaa;
+}
+QLabel#InfoBadge {
+    background-color: #333;
+    color: #ccc;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 3px 8px;
+}
+QLabel#RouteCode {
+    font-size: 26px;
+    font-weight: bold;
+    color: white;
+}
+QLabel#DataLabel {
+    color: #777;
+    font-size: 10px;
+    font-weight: bold;
+}
+QLabel#DataValue {
+    color: #f4b400;
+    font-size: 16px;
+    font-weight: bold;
 }
 """
