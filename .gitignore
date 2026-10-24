@@ -4,3 +4,6 @@
 /data
 frontend/.styles.py.kate-swp
 download_assets.py
+RadarRC.spec
+/build
+/dist
