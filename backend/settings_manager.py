@@ -2,13 +2,25 @@
 
 import json
 import os
+import sys
+
+def get_data_dir():
+    """Mendapatkan folder penyimpanan yang aman untuk aplikasi."""
+    if getattr(sys, 'frozen', False):
+        # Mode PyInstaller (.exe / executable)
+        if sys.platform == 'win32':
+            base_dir = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'RadarRC')
+        else:
+            base_dir = os.path.join(os.path.expanduser('~'), '.radarrc')
+    else:
+        # Mode Development (python run.py)
+        base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    os.makedirs(base_dir, exist_ok=True)
+    return base_dir
 
 class SettingsManager:
     def __init__(self):
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.path = os.path.join(base_dir, "data", "settings.json")
-
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        self.path = os.path.join(get_data_dir(), "settings.json")
         self.settings = self.load()
 
     def load(self):
@@ -26,7 +38,7 @@ class SettingsManager:
                     loaded = json.load(f)
                     defaults.update(loaded)
             except Exception as e:
-                print(f"[SETTINGS ERROR] Failed load file: {e}")
+                print(f"[SETTINGS ERROR] Failed to load file: {e}")
 
         return defaults
 
@@ -36,7 +48,7 @@ class SettingsManager:
             with open(self.path, "w") as f:
                 json.dump(self.settings, f, indent=4)
         except Exception as e:
-            print(f"[SETTINGS ERROR] Failed save: {e}")
+            print(f"[SETTINGS ERROR] Failed to save: {e}")
 
     def get(self, key, default=None):
         return self.settings.get(key, default)

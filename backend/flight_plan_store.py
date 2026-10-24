@@ -4,11 +4,30 @@ import sqlite3
 import json
 import os
 import time
+import sys
+
+def get_data_dir():
+    """Menentukan lokasi penyimpanan database yang aman untuk PyInstaller."""
+    if getattr(sys, 'frozen', False):
+        # Berjalan sebagai aplikasi hasil build (PyInstaller)
+        if sys.platform == 'win32':
+            base_dir = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'RadarRC')
+        else:
+            # Linux / macOS
+            base_dir = os.path.join(os.path.expanduser('~'), '.radarrc')
+    else:
+        # Berjalan sebagai script Python biasa (development)
+        # Mengarah ke folder 'data' di root proyek
+        base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+
+    os.makedirs(base_dir, exist_ok=True)
+    return base_dir
 
 class FlightPlanStore:
-    def __init__(self, db_path="data/flight_plans.db"):
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.db_path = db_path
+    def __init__(self):
+        # Gunakan direktori yang aman untuk database
+        data_dir = get_data_dir()
+        self.db_path = os.path.join(data_dir, "flight_plans.db")
         self._init_db()
 
     def _init_db(self):
@@ -25,7 +44,6 @@ class FlightPlanStore:
                     trail_data TEXT
                 )
             """)
-            # TABEL BARU UNTUK BANDARA
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS airport_data (
                     icao TEXT PRIMARY KEY,
@@ -70,7 +88,7 @@ class FlightPlanStore:
             if row: return json.loads(row[0])
         return []
 
-    # --- AIRPORT DATA (BARU) ---
+    # --- AIRPORT DATA ---
     def save_airport_data(self, icao, data_dict):
         if not icao: return
         try:
