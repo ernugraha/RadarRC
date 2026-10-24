@@ -3,10 +3,10 @@
 import os
 import re
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout, QApplication)
-from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QPixmap
-from frontend.airlines import get_airline_name, get_airline_keys
+                               QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout, QApplication, QSizePolicy)
+from PySide6.QtCore import Qt, Signal, QTimer, QRectF
+from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QPen, QColor
+from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao # IMPORT ICAO
 
 def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
     if not os.path.exists(photo_dir):
@@ -69,29 +69,50 @@ class FlightPanel(QFrame):
         self.setFixedHeight(65)
         self.setCursor(Qt.PointingHandCursor)
         self.original_callsign = ""
+
         p_layout = QVBoxLayout(self)
         p_layout.setContentsMargins(10, 8, 10, 8)
         p_layout.setSpacing(2)
+
         row1 = QHBoxLayout()
         self.lbl_callsign = QLabel("CALLSIGN")
         self.lbl_callsign.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
+
         self.lbl_type = QLabel("TYPE")
         self.lbl_type.setStyleSheet("color: #aaa; font-size: 11px; font-weight: bold; margin-left: 5px;")
+
         self.lbl_speed = QLabel("0 kts")
         self.lbl_speed.setObjectName("AccentText")
+
         row1.addWidget(self.lbl_callsign)
         row1.addWidget(self.lbl_type)
-        row1.addStretch()
+        row1.addStretch() # Mendorong speed ke kanan
         row1.addWidget(self.lbl_speed)
+
         self.lbl_route = QLabel("N/A - N/A")
         self.lbl_route.setObjectName("SubText")
+
         p_layout.addLayout(row1)
         p_layout.addWidget(self.lbl_route)
 
     def set_data(self, callsign, info):
         self.original_callsign = callsign
-        clean_callsign = callsign.split("-")[0] if "-" in callsign else callsign
-        self.lbl_callsign.setText(clean_callsign)
+
+        # AMBIL KODE ICAO (BAW, DAL, SIA, dll)
+        icao = get_airline_icao(callsign)
+
+        # Pisahkan nomor penerbangan (misal: Speedbird-1234 -> 1234)
+        parts = callsign.split("-")
+        flight_num = parts[-1] if len(parts) > 1 else ""
+
+        # Format menjadi BAW1234 (jika ICAO ditemukan)
+        if icao != "???":
+            display_name = f"{icao}{flight_num}"
+        else:
+            # Jika tidak ada di database, gunakan prefix aslinya (misal: Lancer)
+            display_name = parts[0]
+
+        self.lbl_callsign.setText(display_name)
         self.lbl_type.setText(info.get("aircraftType", "Unknown").upper())
         self.lbl_speed.setText(f"{int(info.get('speed', 0))} kts")
         self.lbl_route.setText(f"{info.get('plan_departing', 'N/A')} - {info.get('plan_arriving', 'N/A')}")
@@ -108,18 +129,24 @@ class Sidebar(QFrame):
         self.setObjectName("Sidebar")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
+
         header = QLabel("Current Flights")
         header.setObjectName("HeaderText")
         layout.addWidget(header)
+
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("background: transparent;")
+        # Matikan scrollbar horizontal agar tidak muncul
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
         self.list_widget = QWidget()
         self.list_widget.setStyleSheet("background: transparent;")
         self.list_layout = QVBoxLayout(self.list_widget)
         self.list_layout.setContentsMargins(0, 0, 0, 0)
         self.list_layout.setSpacing(8)
         self.list_layout.setAlignment(Qt.AlignTop)
+
         self.panels = []
         for _ in range(30):
             p = FlightPanel()
@@ -127,6 +154,7 @@ class Sidebar(QFrame):
             self.panels.append(p)
             self.list_layout.addWidget(p)
             p.hide()
+
         self.scroll_area.setWidget(self.list_widget)
         layout.addWidget(self.scroll_area)
 
@@ -228,8 +256,6 @@ class FlightInfoPanel(QFrame):
 
         main_layout.addWidget(telemetry_frame)
 
-        main_layout.addStretch()
-
         # ================= PILOT INFO =================
         pilot_frame = QFrame()
         pilot_frame.setStyleSheet("background-color: #111; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
@@ -248,6 +274,7 @@ class FlightInfoPanel(QFrame):
         pilot_layout.addWidget(self.btn_pilot)
 
         main_layout.addWidget(pilot_frame)
+        main_layout.addStretch()
 
         self.current_pilot_name = "Unknown"
 
@@ -272,10 +299,11 @@ class FlightInfoPanel(QFrame):
         QTimer.singleShot(1500, lambda: self.btn_pilot.setText(self.current_pilot_name))
 
     def set_flight_data(self, callsign, info):
-        airline_name = get_airline_name(callsign)
+        real_airline = get_airline_name(callsign)
+
         self.lbl_callsign.setText(callsign)
         self.lbl_badge.setText(info.get("aircraftType", "Unknown").upper())
-        self.lbl_airline.setText(airline_name)
+        self.lbl_airline.setText(real_airline)
 
         dep = info.get("plan_departing", "N/A")
         arr = info.get("plan_arriving", "N/A")
@@ -290,30 +318,44 @@ class FlightInfoPanel(QFrame):
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
-        # ================= LOGIKA LOAD FOTO (ZOOM 125%) =================
+        # ================= LOGIKA LOAD FOTO =================
         photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
 
         if photo_path:
             pixmap = QPixmap(photo_path)
             if not pixmap.isNull():
                 target_w, target_h = 310, 180
-
-                # KUNCI ZOOM 125%: Perbesar target scaling sebelum dipotong
                 zoom_factor = 1.25
                 scale_w = int(target_w * zoom_factor)
                 scale_h = int(target_h * zoom_factor)
 
-                # 1. Perbesar gambar agar menutupi area yang lebih besar
                 scaled = pixmap.scaled(scale_w, scale_h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-
-                # 2. Potong bagian tengahnya tepat seukuran kotak asli (310x180)
                 x_offset = (scaled.width() - target_w) // 2
                 y_offset = (scaled.height() - target_h) // 2
                 cropped = scaled.copy(x_offset, y_offset, target_w, target_h)
 
-                self.photo_box.setPixmap(cropped)
+                rounded_pixmap = QPixmap(target_w, target_h)
+                rounded_pixmap.fill(Qt.transparent)
+
+                painter = QPainter(rounded_pixmap)
+                painter.setRenderHint(QPainter.Antialiasing)
+
+                path = QPainterPath()
+                path.addRoundedRect(QRectF(0, 0, target_w, target_h), 6, 6)
+
+                painter.setClipPath(path)
+                painter.drawPixmap(0, 0, cropped)
+
+                pen = QPen(QColor("#444"))
+                pen.setWidth(1)
+                painter.setPen(pen)
+                painter.drawPath(path)
+
+                painter.end()
+
+                self.photo_box.setPixmap(rounded_pixmap)
                 self.photo_box.setText("")
-                self.photo_box.setStyleSheet("background-color: #000; border: 1px solid #444; border-radius: 6px;")
+                self.photo_box.setStyleSheet("background-color: transparent; border: none;")
             else:
                 self.photo_box.clear()
                 self.photo_box.setText("?")

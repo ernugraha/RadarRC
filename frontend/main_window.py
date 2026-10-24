@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
-        panel_height = 480
+        panel_height = min(650, h - 150)
         self.sidebar.setGeometry(20, 100, 340, panel_height)
         self.info_panel.setGeometry(-360, 100, 340, panel_height)
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
     def animate_panels(self, show_info):
         self.sidebar_anim.stop()
         self.info_anim.stop()
-        panel_height = min(600, self.height() - 200)
+        panel_height = min(650, self.height() - 150)
 
         if show_info:
             self.info_panel.show()
