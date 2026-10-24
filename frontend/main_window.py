@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsScene, QGraphicsPixmapItem,
                                QMessageBox, QApplication)
 from PySide6.QtGui import QColor, QPen, QPixmap, QTransform, QIcon, QFont
 from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QRectF
+from PySide6.QtSvg import QSvgRenderer
 
 from frontend.styles import MAIN_STYLESHEET
 from frontend.ui_components import (TopBar, Sidebar, BottomToolbar, MapControls,
@@ -42,8 +43,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("RadarRC")
 
-        if os.path.exists("assets/icon.png"):
-            self.setWindowIcon(QIcon("assets/icon.png"))
+        # --- UPDATE IKON SVG ---
+        icon_svg = "assets/icon.svg"
+        icon_png = "assets/icon.png"
+
+        if os.path.exists(icon_svg):
+            self.setWindowIcon(QIcon(icon_svg))
+        elif os.path.exists(icon_png):
+            self.setWindowIcon(QIcon(icon_png))
 
         self.settings_mgr = SettingsManager()
         self.resize(self.settings_mgr.get("window_width", 1400),

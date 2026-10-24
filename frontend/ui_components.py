@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                                QApplication, QSizePolicy, QCheckBox, QSlider)
 from PySide6.QtCore import Qt, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QPen, QColor
+from PySide6.QtSvg import QSvgRenderer
 from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao
 from frontend.airports import get_airport_name
 
@@ -58,18 +59,64 @@ def find_airport_photo(icao, photo_dir="assets/airports"):
 # ==========================================
 # TOP BAR
 # ==========================================
+# frontend/ui_components.py
+
+import os
+import re
+from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
+                               QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout,
+                               QApplication, QSizePolicy, QCheckBox, QSlider)
+from PySide6.QtCore import Qt, Signal, QTimer, QRectF
+from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QPen, QColor
+from PySide6.QtSvg import QSvgRenderer # <-- IMPORT BARU UNTUK SVG
+from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao
+from frontend.airports import get_airport_name
+
+# ... (fungsi find_aircraft_photo, dll biarkan sama) ...
+
+# ==========================================
+# TOP BAR (UPDATE LOGO SVG)
+# ==========================================
 class TopBar(QWidget):
     search_triggered = Signal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 0)
-        logo = QLabel("RadarRC")
-        logo.setObjectName("AppLogo")
+
+        logo = QLabel()
+        logo_path_svg = "assets/logo.svg"
+        logo_path_png = "assets/logo.png"
+
+        if os.path.exists(logo_path_svg):
+            # Render SVG ke QPixmap resolusi tinggi
+            renderer = QSvgRenderer(logo_path_svg)
+            size = renderer.defaultSize()
+            # Render pada ukuran 3x dari tinggi target (40px) agar tajam
+            target_h = 120
+            target_w = int(size.width() * (target_h / size.height())) if size.height() > 0 else 120
+
+            pixmap = QPixmap(target_w, target_h)
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            renderer.render(painter)
+            painter.end()
+
+            # Kecilkan ke tinggi 40px untuk ditampilkan
+            logo.setPixmap(pixmap.scaledToHeight(40, Qt.SmoothTransformation))
+
+        elif os.path.exists(logo_path_png):
+            # Fallback ke PNG jika SVG tidak ada
+            pixmap = QPixmap(logo_path_png)
+            logo.setPixmap(pixmap.scaledToHeight(40, Qt.SmoothTransformation))
+        else:
+            # Fallback ke Teks jika tidak ada gambar sama sekali
+            logo.setText("RadarRC")
+            logo.setObjectName("AppLogo")
 
         self.search_bar = QLineEdit()
         self.search_bar.setObjectName("SearchBar")
-        self.search_bar.setPlaceholderText("Find flights (e.g., BAW123, PilotName)... (Press Enter)")
+        self.search_bar.setPlaceholderText("Find flights (e.g., BAW123, username)...")
         self.search_bar.setFixedWidth(450)
         self.search_bar.returnPressed.connect(self.on_search_enter)
 
