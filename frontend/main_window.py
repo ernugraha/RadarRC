@@ -24,6 +24,7 @@ class MainWindow(QMainWindow):
 
         self.scene = QGraphicsScene()
         self.view = MapView(self.scene, self)
+        self.view.setStyleSheet("border: none; background-color: #131313;")
         self.setCentralWidget(self.view)
 
         self.setup_map()
@@ -45,6 +46,8 @@ class MainWindow(QMainWindow):
         self.bottom_toolbar.setGeometry((w - tb_w)//2, h - 90, tb_w, 60)
 
     def setup_map(self):
+        self.scene.setBackgroundBrush(QColor("#131313"))
+
         map_path = "assets/maps/full_map_small.png"
 
         if not os.path.exists(map_path):
