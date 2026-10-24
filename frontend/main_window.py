@@ -4,7 +4,7 @@ import os
 import time
 from PySide6.QtWidgets import QMainWindow, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QFrame, QGraphicsOpacityEffect
 from PySide6.QtGui import QColor, QPen, QPixmap, QTransform
-from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
+from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer
 
 from frontend.styles import MAIN_STYLESHEET
 from frontend.ui_components import (TopBar, Sidebar, BottomToolbar, MapControls,
@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         self.filter_panel.filters_changed.connect(self.apply_filters)
         self.settings_panel.settings_changed.connect(self.apply_settings)
 
-        # Animasi Sidebar Info
+        # Animasi Sidebar & Info Panel
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
         self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -100,19 +100,13 @@ class MainWindow(QMainWindow):
             self.weather_panel.update_atis(self.current_atis_data)
             self.show_popup(self.weather_panel)
         elif tool_name == "Widgets":
-            # KUNCI ANIMASI WIDGETS
-            self.sidebar_visible = not self.sidebar_visible
-            panel_height = min(750, self.height() - 120)
-
-            self.sidebar_anim.stop()
-            self.sidebar_anim.setStartValue(self.sidebar.geometry())
-
-            if self.sidebar_visible:
-                self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            # KUNCI: Jika Info Pesawat sedang terbuka, tombol Widgets menutup Info Pesawat
+            if self.info_panel.isVisible() and self.info_panel.geometry().x() == 20:
+                self.scene.clearSelection()
             else:
-                self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
-
-            self.sidebar_anim.start()
+                # Jika tidak ada info, toggle Sidebar Kiri
+                self.sidebar_visible = not self.sidebar_visible
+                self.update_sidebar_animation()
             return
 
         self.active_popup = tool_name
@@ -154,6 +148,19 @@ class MainWindow(QMainWindow):
         panel.anim_opacity.start()
         panel.anim_geom.start()
 
+    def update_sidebar_animation(self):
+        """Menganimasikan Sidebar kiri masuk/keluar."""
+        panel_height = min(750, self.height() - 120)
+        self.sidebar_anim.stop()
+        self.sidebar_anim.setStartValue(self.sidebar.geometry())
+
+        if self.sidebar_visible:
+            self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+        else:
+            self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+
+        self.sidebar_anim.start()
+
     def apply_filters(self, hide_ground, min_alt, hide_heli):
         self.filter_hide_ground = hide_ground
         self.filter_min_alt = min_alt
@@ -182,6 +189,7 @@ class MainWindow(QMainWindow):
         self.top_bar.setGeometry(0, 0, w, 80)
         panel_height = min(750, h - 120)
 
+        # Atur posisi sidebar saat resize
         if self.sidebar_visible:
             self.sidebar.setGeometry(20, 100, 340, panel_height)
         else:
@@ -250,18 +258,33 @@ class MainWindow(QMainWindow):
 
         if show_info:
             self.info_panel.show()
+            self.sidebar_anim.setStartValue(self.sidebar.geometry())
             self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+
+            self.info_anim.setStartValue(self.info_panel.geometry())
             self.info_anim.setEndValue(QRect(20, 100, 340, panel_height))
+
+            self.sidebar_anim.start()
+            self.info_anim.start()
         else:
-            # Saat info panel ditutup, sidebar kembali sesuai state sidebar_visible
+            self.sidebar_anim.setStartValue(self.sidebar.geometry())
             if self.sidebar_visible:
                 self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
             else:
                 self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+
+            self.info_anim.setStartValue(self.info_panel.geometry())
             self.info_anim.setEndValue(QRect(-360, 100, 340, panel_height))
 
-        self.sidebar_anim.start()
-        self.info_anim.start()
+            self.sidebar_anim.start()
+            self.info_anim.start()
+
+            # KUNCI: Sembunyikan Info Panel setelah animasi selesai
+            QTimer.singleShot(300, self.check_hide_info_panel)
+
+    def check_hide_info_panel(self):
+        if self.info_panel.geometry().x() <= -360:
+            self.info_panel.hide()
 
     def on_aircraft_selected(self):
         selected_items = self.scene.selectedItems()
