@@ -21,7 +21,6 @@ class DataClient(QObject):
         self._last_cleanup_time = 0
 
     def process_aircraft(self, payload):
-        # ... (Sama seperti sebelumnya)
         if not isinstance(payload, dict): return {}
         result = {}
         active_callsigns = set()
@@ -88,16 +87,13 @@ class DataClient(QObject):
                                 for c in controllers:
                                     if c.get("holder"):
                                         apt = c.get("airport")
-                                        pos = c.get("position") # GND, TWR, CTR
+                                        pos = c.get("position")
                                         if apt not in parsed: parsed[apt] = {}
                                         parsed[apt][pos] = c.get("holder")
-
-                                # Simpan ke DB berdasarkan bandara
                                 for apt, atc_info in parsed.items():
                                     existing = self.plan_store.get_airport_data(apt)
                                     existing["atc"] = atc_info
                                     self.plan_store.save_airport_data(apt, existing)
-
                                 self.controllers_data_received.emit(parsed)
 
                             elif event_type == "ATIS":
@@ -106,17 +102,19 @@ class DataClient(QObject):
                                 for a in atis_list:
                                     apt = a.get("airport")
                                     parsed_atis[apt] = a
-
-                                    # Simpan ke DB berdasarkan bandara
                                     existing = self.plan_store.get_airport_data(apt)
                                     existing["atis"] = a
                                     self.plan_store.save_airport_data(apt, existing)
-
                                 self.atis_data_received.emit(parsed_atis)
 
                         except websockets.exceptions.ConnectionClosed:
                             self.connection_status.emit("[WARNING] Connection closed. Reconnecting...")
                             break
+
+            except asyncio.CancelledError:
+                # KUNCI PERBAIKAN: Tangkap pembatalan agar koneksi ditutup dengan rapi
+                self.connection_status.emit("[INFO] WebSocket task cancelled. Disconnecting...")
+                break
             except Exception as e:
                 self.connection_status.emit(f"[ERROR] Connection failed: {e}")
 

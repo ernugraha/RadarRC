@@ -24,11 +24,20 @@ def main():
 
     ws_task = loop.create_task(client.connect())
 
+    # Flag untuk mencegah penutupan berjalan dua kali
+    shutting_down = False
+
     def on_app_close():
+        nonlocal shutting_down
+        if shutting_down:
+            return
+        shutting_down = True
+
         print("\n[INFO] Closing app...")
         client.stop()
-        ws_task.cancel()
-        loop.stop()
+
+        if not ws_task.done():
+            ws_task.cancel()
 
     app.aboutToQuit.connect(on_app_close)
 
