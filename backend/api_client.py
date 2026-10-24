@@ -6,7 +6,6 @@ import websockets
 from PySide6.QtCore import QObject, Signal
 
 class FlightPlanStore:
-    """Penyimpanan Flight Plan sederhana yang diadaptasi dari referensi Anda."""
     def __init__(self):
         self.plans = {}
 
@@ -58,7 +57,7 @@ class DataClient(QObject):
     async def connect(self):
         self.is_running = True
         while self.is_running:
-            self.connection_status.emit(f"[INFO] Connecting to 24Data API... (Retry dalam {self.reconnect_delay} detik jika gagal)")
+            self.connection_status.emit(f"[INFO] Connecting to 24Data API...")
             try:
                 # KUNCI PERBAIKAN:
                 # 1. origin=None (tidak mengirim header Origin)
@@ -84,14 +83,14 @@ class DataClient(QObject):
                                 self.plan_store.add(data.get("d", {}))
                         except websockets.exceptions.ConnectionClosed as e:
                             # Mencetak alasan penutupan yang sebenarnya
-                            self.connection_status.emit(f"[WARNING] Koneksi ditutup oleh server. Kode: {e.code}, Alasan: {e.reason}. Reconnecting...")
+                            self.connection_status.emit(f"[WARNING] Connection closed by server. Code: {e.code}, Reason: {e.reason}. Reconnecting...")
                             break
                         except Exception as e:
-                            self.connection_status.emit(f"[ERROR] Terjadi kesalahan saat menerima pesan: {e}")
+                            self.connection_status.emit(f"[ERROR] An error occurred while receiving a message: {e}")
                             break
 
             except Exception as e:
-                self.connection_status.emit(f"[ERROR] Gagal terhubung: {e}")
+                self.connection_status.emit(f"[ERROR] Failed to connect: {e}")
 
             if self.is_running:
                 await asyncio.sleep(self.reconnect_delay)

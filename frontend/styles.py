@@ -9,24 +9,66 @@ QWidget {
     font-family: "Segoe UI", "Noto Sans", sans-serif;
 }
 
-/* --- OVERLAY CONTAINER --- */
-QWidget#OverlayContainer {
-    background: transparent;
-}
-
-/* --- SIDEBAR (KIRI) --- */
+/* --- SIDEBAR & PANEL INFO --- */
 QFrame#Sidebar {
     background-color: rgba(25, 25, 25, 0.95);
     border-radius: 12px;
     border: 1px solid #333;
 }
+
+/* Desain Item Pesawat (Ala FR24) */
 QFrame#FlightPanel {
-    background-color: rgba(40, 40, 40, 0.9);
+    background-color: #2b2b2b;
     border-radius: 8px;
-    margin-bottom: 8px;
+    border: 1px solid #333;
 }
 QFrame#FlightPanel:hover {
-    background-color: rgba(55, 55, 55, 0.9);
+    background-color: #3a3a3a;
+    border: 1px solid #f4b400;
+}
+
+/* Badge Kecil (Untuk Tipe Pesawat & Bandara) */
+QLabel#Badge {
+    background-color: #444;
+    color: #aaa;
+    font-size: 10px;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+QLabel#BadgeBlue {
+    background-color: #1d4ed8;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+/* --- SCROLLBAR CUSTOM --- */
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 6px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical {
+    background: #f4b400;
+    min-height: 30px;
+    border-radius: 3px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #ffc400;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: transparent;
 }
 
 /* --- TOP BAR --- */
@@ -69,7 +111,7 @@ QPushButton#ToolBtn:hover {
     border-radius: 15px;
 }
 
-/* --- MAP CONTROLS (ZOOM) --- */
+/* --- MAP CONTROLS --- */
 QPushButton#ZoomBtn {
     background-color: rgba(40, 40, 40, 0.9);
     color: white;
@@ -79,18 +121,6 @@ QPushButton#ZoomBtn {
     border: 1px solid #555;
 }
 QPushButton#ZoomBtn:hover {
-    background-color: rgba(70, 70, 70, 0.9);
-}
-
-QPushButton#EditBtn {
-    background-color: rgba(40, 40, 40, 0.9);
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    border-radius: 25px;
-    border: 1px solid #555;
-}
-QPushButton#EditBtn:hover {
     background-color: rgba(70, 70, 70, 0.9);
 }
 
@@ -111,6 +141,6 @@ QLabel#AccentText {
 }
 QLabel#SubText {
     color: #999;
-    font-size: 13px;
+    font-size: 12px;
 }
 """
