@@ -12,21 +12,27 @@ class FlightPlanStore:
 
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:
+            # Tabel Flight Plan
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS plans (
                     callsign TEXT PRIMARY KEY,
                     plan_data TEXT
                 )
             """)
+            # Tabel Trail (Jejak)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS trails (
+                    callsign TEXT PRIMARY KEY,
+                    trail_data TEXT
+                )
+            """)
             conn.commit()
 
+    # ================= FUNGSI FLIGHT PLAN =================
     def save_plan(self, callsign, plan_data):
         """Menyimpan atau memperbarui flight plan."""
         if not callsign:
             return
-
-        # Hanya simpan data yang penting (sesuaikan dengan API)
-        # Plan dari ATC24 biasanya berisi: aircraft, departing, arriving, route, dll.
         try:
             plan_json = json.dumps(plan_data)
             with sqlite3.connect(self.db_path) as conn:
@@ -35,8 +41,8 @@ class FlightPlanStore:
                     (callsign, plan_json)
                 )
                 conn.commit()
-        except Exception as e:
-            print(f"Error saving plan: {e}")
+        except Exception:
+            pass
 
     def get_plan(self, callsign):
         """Mengambil flight plan berdasarkan callsign."""
@@ -50,7 +56,7 @@ class FlightPlanStore:
         return None
 
     def get_all_plans(self):
-        """Mengambil semua flight plan (untuk keperluan inisialisasi memori)."""
+        """Mengambil semua flight plan."""
         plans = {}
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT callsign, plan_data FROM plans")
@@ -58,21 +64,53 @@ class FlightPlanStore:
                 plans[row[0]] = json.loads(row[1])
         return plans
 
-    def cleanup_stale_plans(self, active_callsigns):
-        """Menghapus flight plan yang pesawatnya sudah tidak ada di radar."""
-        if not active_callsigns:
+    # ================= FUNGSI TRAIL =================
+    def save_trail(self, callsign, trail_points):
+        """Menyimpan list koordinat [(x,y,alt), ...] ke database."""
+        if not callsign or not trail_points:
             return
+        try:
+            trail_json = json.dumps(trail_points)
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO trails (callsign, trail_data) VALUES (?, ?)",
+                    (callsign, trail_json)
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    def get_trail(self, callsign):
+        """Mengambil data trail pesawat."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT trail_data FROM trails WHERE callsign = ?", (callsign,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return json.loads(row[0])
+        return []
+
+    # ================= FUNGSI CLEANUP =================
+    def cleanup_stale_data(self, active_callsigns):
+        """Menghapus flight plan DAN trail usang yang pesawatnya sudah tidak ada."""
+        if not active_callsigns: return
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("SELECT callsign FROM plans")
-            all_saved = [row[0] for row in cursor.fetchall()]
+            all_plans = [row[0] for row in cursor.fetchall()]
+            to_delete_plans = [cs for cs in all_plans if cs not in active_callsigns]
 
-            # Cari yang ada di database tapi TIDAK ADA di pesawat aktif
-            to_delete = [cs for cs in all_saved if cs not in active_callsigns]
+            cursor = conn.execute("SELECT callsign FROM trails")
+            all_trails = [row[0] for row in cursor.fetchall()]
+            to_delete_trails = [cs for cs in all_trails if cs not in active_callsigns]
 
-            if to_delete:
-                # Hapus dari database
-                placeholders = ','.join('?' for _ in to_delete)
-                conn.execute(f"DELETE FROM plans WHERE callsign IN ({placeholders})", to_delete)
-                conn.commit()
-                print(f"[CLEANUP] Menghapus {len(to_delete)} flight plan usang.")
+            if to_delete_plans:
+                placeholders = ','.join('?' for _ in to_delete_plans)
+                conn.execute(f"DELETE FROM plans WHERE callsign IN ({placeholders})", to_delete_plans)
+
+            if to_delete_trails:
+                placeholders = ','.join('?' for _ in to_delete_trails)
+                conn.execute(f"DELETE FROM trails WHERE callsign IN ({placeholders})", to_delete_trails)
+
+            conn.commit()

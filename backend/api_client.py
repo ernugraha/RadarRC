@@ -57,7 +57,7 @@ class DataClient(QObject):
         # Jalankan pembersihan database setiap 30 detik sekali
         now = asyncio.get_event_loop().time()
         if now - self._last_cleanup_time > 30:
-            self.plan_store.cleanup_stale_plans(active_callsigns)
+            self.plan_store.cleanup_stale_data(active_callsigns) # Ganti nama fungsi
             self._last_cleanup_time = now
 
         return result

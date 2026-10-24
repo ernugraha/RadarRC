@@ -8,9 +8,10 @@ from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
 
 from frontend.styles import MAIN_STYLESHEET
 from frontend.ui_components import TopBar, Sidebar, BottomToolbar, MapControls, FlightInfoPanel
-from frontend.map_items import AircraftItem, load_icons
+from frontend.map_items import AircraftItem, load_icons, TrailItem
 from frontend.map_view import MapView
 from frontend.airlines import get_airline_icao
+from frontend.trail_manager import TrailManager
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -23,6 +24,10 @@ class MainWindow(QMainWindow):
         self.aircraft_items = {}
         self.current_data = {}
         self.last_sidebar_update = 0
+
+        # Inisialisasi Trail Manager
+        self.trail_manager = TrailManager(max_points=300)
+        self.current_trail_item = None
 
         self.scene = QGraphicsScene()
         self.view = MapView(self.scene, self)
@@ -37,13 +42,13 @@ class MainWindow(QMainWindow):
         self.map_controls = MapControls(self.view, self.view)
         self.bottom_toolbar = BottomToolbar(self.view)
 
+        # Hubungkan Sinyal
         self.info_panel.closed.connect(self.close_info_panel)
         self.scene.selectionChanged.connect(self.on_aircraft_selected)
         self.sidebar.flight_clicked.connect(self.focus_on_aircraft)
-
-        # Hubungkan sinyal pencarian
         self.top_bar.search_triggered.connect(self.perform_search)
 
+        # Animasi Panel
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
         self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -57,17 +62,16 @@ class MainWindow(QMainWindow):
         self.info_panel.hide()
 
     def perform_search(self, query):
-        """Mencari pesawat berdasarkan Callsign, ICAO, Tipe, atau Nama Pilot."""
         query = query.lower()
         matched_callsign = None
 
         for callsign, info in self.current_data.items():
-            # 1. Cek berdasarkan Callsign asli (misal: Shamrock-123)
+            # 1. Cek Callsign
             if query in callsign.lower():
                 matched_callsign = callsign
                 break
 
-            # 2. Cek berdasarkan format ICAO (misal: BAW123)
+            # 2. Cek format ICAO
             icao = get_airline_icao(callsign)
             flight_num = callsign.split("-")[-1] if "-" in callsign else ""
             icao_format = f"{icao}{flight_num}".lower()
@@ -75,12 +79,12 @@ class MainWindow(QMainWindow):
                 matched_callsign = callsign
                 break
 
-            # 3. Cek berdasarkan Tipe Pesawat (misal: b737)
+            # 3. Cek Tipe Pesawat
             if query in info.get("aircraftType", "").lower():
                 matched_callsign = callsign
                 break
 
-            # 4. Cek berdasarkan Nama Pilot (misal: jeff)
+            # 4. Cek Nama Pilot
             if query in info.get("playerName", "").lower():
                 matched_callsign = callsign
                 break
@@ -116,6 +120,7 @@ class MainWindow(QMainWindow):
         self.map_item.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.scene.addItem(self.map_item)
 
+        # Kalibrasi Peta
         self.map_offset_x = -587.3
         self.map_offset_y = -553.0
         self.map_scale_x = 0.2812
@@ -137,18 +142,6 @@ class MainWindow(QMainWindow):
             item.setSelected(True)
             self.view.centerOn(item)
 
-    def on_aircraft_selected(self):
-        selected_items = self.scene.selectedItems()
-        if selected_items:
-            item = selected_items[0]
-            if isinstance(item, AircraftItem):
-                callsign = item.callsign
-                if callsign in self.current_data:
-                    self.info_panel.set_flight_data(callsign, self.current_data[callsign])
-                    self.animate_panels(show_info=True)
-        else:
-            self.animate_panels(show_info=False)
-
     def close_info_panel(self):
         self.scene.clearSelection()
 
@@ -168,15 +161,43 @@ class MainWindow(QMainWindow):
         self.sidebar_anim.start()
         self.info_anim.start()
 
+    def on_aircraft_selected(self):
+        selected_items = self.scene.selectedItems()
+
+        # Hapus trail lama dari layar jika ada
+        if self.current_trail_item:
+            self.scene.removeItem(self.current_trail_item)
+            self.current_trail_item = None
+
+        if selected_items:
+            item = selected_items[0]
+            if isinstance(item, AircraftItem):
+                callsign = item.callsign
+                if callsign in self.current_data:
+                    self.info_panel.set_flight_data(callsign, self.current_data[callsign])
+                    self.animate_panels(show_info=True)
+
+                    # Gambar Trail jika datanya ada
+                    trail_points = self.trail_manager.get_trail(callsign)
+                    if len(trail_points) > 1:
+                        self.current_trail_item = TrailItem()
+                        self.current_trail_item.set_points(trail_points)
+                        self.scene.addItem(self.current_trail_item)
+        else:
+            self.animate_panels(show_info=False)
+
     def update_aircraft(self, data_dict):
         self.current_data = data_dict
+        active_callsigns = set(data_dict.keys())
 
         for callsign, info in data_dict.items():
             if "x" not in info or "y" not in info: continue
             x, y = info["x"], info["y"]
             heading = info.get("heading", 0)
+            alt = info.get("altitude", 0)
             ac_type = info.get("aircraftType", "")
 
+            # Update Posisi Pesawat
             if callsign not in self.aircraft_items:
                 plane = AircraftItem(callsign, ac_type)
                 self.scene.addItem(plane)
@@ -184,6 +205,24 @@ class MainWindow(QMainWindow):
 
             self.aircraft_items[callsign].update_data(x, y, heading, ac_type)
 
+            # Rekam Jejak
+            self.trail_manager.add_point(callsign, x, y, alt)
+
+        # Sinkronisasi ke Database (setiap 2 detik)
+        self.trail_manager.sync_to_db()
+
+        # Perbarui garis yang sedang tampil (jika pesawat masih dipilih)
+        selected_items = self.scene.selectedItems()
+        if selected_items and isinstance(selected_items[0], AircraftItem):
+            selected_cs = selected_items[0].callsign
+            if self.current_trail_item and selected_cs in active_callsigns:
+                trail_points = self.trail_manager.get_trail(selected_cs)
+                self.current_trail_item.set_points(trail_points)
+
+        # Bersihkan memori pesawat yang hilang
+        self.trail_manager.cleanup(active_callsigns)
+
+        # Update Sidebar tiap 1 detik
         now = time.time()
         if now - self.last_sidebar_update > 1.0:
             self.sidebar.update_data(data_dict)
