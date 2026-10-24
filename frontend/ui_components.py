@@ -191,54 +191,48 @@ class FlightInfoPanel(QFrame):
         photo_layout.setContentsMargins(15, 15, 15, 0)
         self.photo_box = QLabel("?")
         self.photo_box.setObjectName("PhotoBox")
-        self.photo_box.setFixedHeight(180)
+        self.photo_box.setFixedSize(310, 180) # Kunci ukuran agar tidak melar
         self.photo_box.setAlignment(Qt.AlignCenter)
-        photo_layout.addWidget(self.photo_box)
+        photo_layout.addWidget(self.photo_box, alignment=Qt.AlignHCenter)
         main_layout.addWidget(photo_frame)
 
-        # ROUTE SECTION (KODE GEDE, NAMA KECIL DI BAWAH)
+        # ROUTE SECTION
         route_frame = QFrame()
         route_layout = QHBoxLayout(route_frame)
         route_layout.setContentsMargins(15, 15, 15, 15)
         route_layout.setSpacing(10)
 
-        # Sisi Kiri (Departure)
         dep_layout = QVBoxLayout()
         dep_layout.setSpacing(0)
-        self.lbl_dep = QLabel("???")
-        self.lbl_dep.setObjectName("RouteCode") # CSS mengatur ini jadi besar
+        self.lbl_dep = QLabel("N/A")
+        self.lbl_dep.setObjectName("RouteCode")
         self.lbl_dep.setAlignment(Qt.AlignCenter)
 
         self.lbl_dep_name = QLabel("")
         self.lbl_dep_name.setStyleSheet("color: #888; font-size: 10px; font-weight: bold;")
         self.lbl_dep_name.setAlignment(Qt.AlignCenter)
-
         dep_layout.addWidget(self.lbl_dep)
         dep_layout.addWidget(self.lbl_dep_name)
 
-        # Tengah (Panah)
         arrow = QLabel("➔")
         arrow.setStyleSheet("color: #f4b400; font-size: 20px;")
         arrow.setAlignment(Qt.AlignCenter)
 
-        # Sisi Kanan (Arrival)
         arr_layout = QVBoxLayout()
         arr_layout.setSpacing(0)
-        self.lbl_arr = QLabel("???")
+        self.lbl_arr = QLabel("N/A")
         self.lbl_arr.setObjectName("RouteCode")
         self.lbl_arr.setAlignment(Qt.AlignCenter)
 
         self.lbl_arr_name = QLabel("")
         self.lbl_arr_name.setStyleSheet("color: #888; font-size: 10px; font-weight: bold;")
         self.lbl_arr_name.setAlignment(Qt.AlignCenter)
-
         arr_layout.addWidget(self.lbl_arr)
         arr_layout.addWidget(self.lbl_arr_name)
 
         route_layout.addLayout(dep_layout, 1)
         route_layout.addWidget(arrow)
         route_layout.addLayout(arr_layout, 1)
-
         main_layout.addWidget(route_frame)
 
         telemetry_frame = QFrame()
@@ -296,11 +290,10 @@ class FlightInfoPanel(QFrame):
         dep_code = info.get("plan_departing", "")
         arr_code = info.get("plan_arriving", "")
 
-        # Kode Besar
-        self.lbl_dep.setText(dep_code if dep_code else "???")
-        self.lbl_arr.setText(arr_code if arr_code else "???")
+        # KEMBALIKAN KE N/A JIKA KOSONG
+        self.lbl_dep.setText(dep_code if dep_code else "N/A")
+        self.lbl_arr.setText(arr_code if arr_code else "N/A")
 
-        # Nama Bandara (Teks Kecil di bawah)
         dep_name = get_airport_name(dep_code) if dep_code else ""
         arr_name = get_airport_name(arr_code) if arr_code else ""
         self.lbl_dep_name.setText(dep_name.upper())
@@ -313,6 +306,7 @@ class FlightInfoPanel(QFrame):
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
+        # ================= PERBAIKAN BORDER FOTO =================
         photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
         if photo_path:
             pixmap = QPixmap(photo_path)
@@ -325,19 +319,32 @@ class FlightInfoPanel(QFrame):
                 x_offset = (scaled.width() - target_w) // 2
                 y_offset = (scaled.height() - target_h) // 2
                 cropped = scaled.copy(x_offset, y_offset, target_w, target_h)
+
                 rounded_pixmap = QPixmap(target_w, target_h)
                 rounded_pixmap.fill(Qt.transparent)
                 painter = QPainter(rounded_pixmap)
                 painter.setRenderHint(QPainter.Antialiasing)
+
+                # Gunakan 0.5 sebagai offset agar border 1px tidak terpotong
                 path = QPainterPath()
-                path.addRoundedRect(QRectF(0, 0, target_w, target_h), 6, 6)
+                path.addRoundedRect(QRectF(0.5, 0.5, target_w - 1, target_h - 1), 6, 6)
+
+                # 1. Potong Gambar
                 painter.setClipPath(path)
                 painter.drawPixmap(0, 0, cropped)
+
+                # 2. MATIKAN CLIPPING SEBELUM GAMBAR BORDER
+                painter.setClipping(False)
+
+                # 3. Gambar Border di atas gambar yang sudah terpotong
                 pen = QPen(QColor("#444"))
                 pen.setWidth(1)
                 painter.setPen(pen)
+                painter.setBrush(Qt.NoBrush) # Jangan isi warna apapun
                 painter.drawPath(path)
+
                 painter.end()
+
                 self.photo_box.setPixmap(rounded_pixmap)
                 self.photo_box.setText("")
                 self.photo_box.setStyleSheet("background-color: transparent; border: none;")
