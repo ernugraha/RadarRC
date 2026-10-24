@@ -9,87 +9,44 @@ from PySide6.QtSvg import QSvgRenderer
 _SVG_CACHE = {}
 
 def load_icons(icons_dir="assets/planes"):
-    if not os.path.exists(icons_dir):
-        print(f"[WARNING] Cannot find: {icons_dir}")
-        return
+    if not os.path.exists(icons_dir): return
     for filename in os.listdir(icons_dir):
         if filename.endswith(".svg"):
             name = filename[:-4].lower()
             renderer = QSvgRenderer(os.path.join(icons_dir, filename))
-            if renderer.isValid():
-                _SVG_CACHE[name] = renderer
-    print(f"[INFO] Loaded {len(_SVG_CACHE)} aircraft icon.")
+            if renderer.isValid(): _SVG_CACHE[name] = renderer
 
-# KAMUS LENGKAP: Mencakup semua file yang sudah Anda unduh
 AIRCRAFT_MAPPING = {
-    # Boeing
     "b737": "b737", "737": "b737", "b738": "b737", "b739": "b737", "b38m": "b737", "b39m": "b737",
     "b747": "b747", "747": "b747", "b741": "b747", "b742": "b747", "b743": "b747", "b744": "b747", "b748": "b747",
-    "b757": "b757", "757": "b757",
-    "b767": "b767", "767": "b767",
+    "b757": "b757", "757": "b757", "b767": "b767", "767": "b767",
     "b777": "b777", "777": "b777", "b772": "b777", "b773": "b777", "b77w": "b777", "b778": "b777", "b779": "b777",
-    "b787": "b787", "787": "b787", "b788": "b787", "b789": "b787", "b78x": "b787",
-    "b707": "b707", "707": "b707",
-
-    # Airbus
+    "b787": "b787", "787": "b787", "b788": "b787", "b789": "b787", "b78x": "b787", "b707": "b707", "707": "b707",
     "a320": "a320", "320": "a320", "a319": "a320", "a321": "a320", "a20n": "a320", "a21n": "a320",
     "a330": "a330", "330": "a330", "a332": "a330", "a333": "a330", "a338": "a330", "a339": "a330",
     "a340": "a340", "340": "a340", "a342": "a340", "a343": "a340", "a345": "a340", "a346": "a340",
-    "a350": "a350", "350": "a350", "a359": "a350", "a35k": "a350",
-    "a380": "a380", "380": "a380", "a388": "a380",
-    "a220": "a220", "220": "a220", "bcs3": "a220",
-    "an225": "an225", "225": "an225",
-    "cncd": "cncd", "concorde": "cncd",
-
-    # Embraer & Bombardier
-    "crj": "crj700", "crj7": "crj700", "crj9": "crj700",
-    "e190": "e190", "e195": "e190", "e175": "e190", "e170": "e190",
-
-    # Turboprops
-    "atr": "atr72", "at72": "atr72", "at76": "atr72", "atr72": "atr72",
-    "dh8d": "dh8d", "q400": "dh8d",
-    "dhc6": "dhc6",
-
-    # General Aviation
-    "c208": "c172", "c172": "c172", "c182": "c172",
-    "da42": "da42", "da40": "da42", "da62": "da42",
-
-    # Others
-    "md11": "md11", "dc10": "dc10", "lj45": "lj45",
-    "c17": "c17", "a400": "c17", "c5m": "c17",
-    "e3": "e3", "p8": "p8",
-
-    # Military
-    "f16": "f16", "f15": "f15", "f18": "f18h", "f22": "f22", "f35": "f35", "f4": "f4e",
-    "a10": "a10", "b1": "b1", "eurofighter": "eurofighter", "typhoon": "eurofighter",
-
-    # Helicopters
-    "h135": "chopper", "h145": "chopper", "uh60": "chopper", "ch47": "chopper",
-    "chopper": "chopper", "helicopter": "chopper"
+    "a350": "a350", "350": "a350", "a359": "a350", "a35k": "a350", "a380": "a380", "380": "a380", "a388": "a380",
+    "a220": "a220", "220": "a220", "bcs3": "a220", "an225": "an225", "225": "an225", "cncd": "cncd", "concorde": "cncd",
+    "crj": "crj700", "crj7": "crj700", "crj9": "crj700", "e190": "e190", "e195": "e190", "e175": "e190", "e170": "e190",
+    "atr": "atr72", "at72": "atr72", "at76": "atr72", "atr72": "atr72", "dh8d": "dh8d", "q400": "dh8d", "dhc6": "dhc6",
+    "c208": "c172", "c172": "c172", "c182": "c172", "da42": "da42", "da40": "da42", "da62": "da42",
+    "md11": "md11", "dc10": "dc10", "lj45": "lj45", "c17": "c17", "a400": "c17", "c5m": "c17", "e3": "e3", "p8": "p8",
+    "f16": "f16", "f15": "f15", "f18": "f18h", "f22": "f22", "f35": "f35", "f4": "f4e", "a10": "a10", "b1": "b1",
+    "eurofighter": "eurofighter", "typhoon": "eurofighter", "h135": "chopper", "h145": "chopper", "uh60": "chopper",
+    "ch47": "chopper", "chopper": "chopper", "helicopter": "chopper"
 }
 
 def get_icon_for_aircraft(ac_type):
     if not ac_type: return None
-
     ac_lower = ac_type.lower().replace(" ", "").replace("-", "")
-
-    # 1. Cari persis (misal: "A340" -> "a340")
     if ac_lower in _SVG_CACHE: return ac_lower
-
-    # 2. Cari via Mapping
     if ac_lower in AIRCRAFT_MAPPING:
         mapped_name = AIRCRAFT_MAPPING[ac_lower]
         if mapped_name in _SVG_CACHE: return mapped_name
-
-    # 3. Cari parsial (misal: "Airbus A340" -> "340" -> "a340")
     for key, mapped_name in AIRCRAFT_MAPPING.items():
-        if key in ac_lower and mapped_name in _SVG_CACHE:
-            return mapped_name
-
-    # 4. Fallback Helikopter
+        if key in ac_lower and mapped_name in _SVG_CACHE: return mapped_name
     if "heli" in ac_lower or "chopper" in ac_lower:
         if "chopper" in _SVG_CACHE: return "chopper"
-
     return None
 
 class AircraftItem(QGraphicsItem):
@@ -100,11 +57,9 @@ class AircraftItem(QGraphicsItem):
         self.heading = 0
         self.size = 8
         self.icon_size = 24
-
         self.is_hovered = False
         self.always_show_label = False
         self.label_text = callsign.split("-")[0] if "-" in callsign else callsign
-
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
         self.setAcceptHoverEvents(True)
@@ -122,16 +77,13 @@ class AircraftItem(QGraphicsItem):
 
     def update_data(self, x, y, heading, aircraft_type="", label_text=""):
         self.setPos(x / 100.0, y / 100.0)
-        if aircraft_type and self.aircraft_type != aircraft_type:
-            self.aircraft_type = aircraft_type
-        if label_text:
-            self.label_text = label_text
+        if aircraft_type and self.aircraft_type != aircraft_type: self.aircraft_type = aircraft_type
+        if label_text: self.label_text = label_text
         if self.heading != heading:
             self.heading = heading
             self.setRotation(self.heading)
 
-    def boundingRect(self):
-        return QRectF(-150, -150, 300, 300)
+    def boundingRect(self): return QRectF(-150, -150, 300, 300)
 
     def shape(self):
         path = QPainterPath()
@@ -178,6 +130,32 @@ class AircraftItem(QGraphicsItem):
             painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
             painter.restore()
 
+class AirportItem(QGraphicsItem):
+    def __init__(self, icao, name):
+        super().__init__()
+        self.icao = icao
+        self.name = name
+        self.size = 14
+        self.setFlag(QGraphicsItem.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+        self.setZValue(0.5)
+
+    def boundingRect(self): return QRectF(-self.size, -self.size, self.size * 2, self.size * 2)
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(QColor("#1d4ed8")))
+        painter.setPen(QPen(Qt.white, 2))
+        painter.drawEllipse(-self.size/2, -self.size/2, self.size, self.size)
+        painter.setPen(QPen(Qt.white))
+        font = QFont("Arial", 8, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(QRectF(-self.size/2, -self.size/2, self.size, self.size), Qt.AlignCenter, "T")
+        if self.isSelected():
+            painter.setPen(QPen(QColor("#f4b400"), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(-self.size/2 - 2, -self.size/2 - 2, self.size + 4, self.size + 4)
+
 class TrailItem(QGraphicsItem):
     def __init__(self):
         super().__init__()
@@ -208,15 +186,23 @@ class TrailItem(QGraphicsItem):
     def paint(self, painter, option, widget=None):
         if len(self.trail_points) < 2: return
         painter.setRenderHint(QPainter.Antialiasing)
+
+        # Ketebalan dinaikkan sedikit agar gradasi terlihat jelas
+        line_width = 4.0
+
         for i in range(1, len(self.trail_points)):
             p1, p2 = self.trail_points[i-1], self.trail_points[i]
+
+            # Warna Gradasi
             color = self._get_smooth_color((p1["alt"] + p2["alt"]) / 2.0)
+
             pen = QPen(color)
-            pen.setWidthF(3.0)
+            pen.setWidthF(line_width)
             pen.setCosmetic(True)
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)
             painter.setPen(pen)
+
             painter.drawLine(QPointF(p1["x"]/100, p1["y"]/100), QPointF(p2["x"]/100, p2["y"]/100))
 
     def _get_smooth_color(self, alt):
@@ -230,39 +216,3 @@ class TrailItem(QGraphicsItem):
                 rat = (alt - a1) / (a2 - a1)
                 return QColor(int(r1+(r2-r1)*rat), int(g1+(g2-g1)*rat), int(b1+(b2-b1)*rat))
         return QColor(255,255,255)
-
-
-class AirportItem(QGraphicsItem):
-    def __init__(self, icao, name):
-        super().__init__()
-        self.icao = icao
-        self.name = name
-        self.size = 14
-        self.setFlag(QGraphicsItem.ItemIsSelectable)
-        self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
-        self.setZValue(0.5)
-
-        # Flag untuk drag (kalibrasi)
-        self.setFlag(QGraphicsItem.ItemIsMovable, False)
-
-    def boundingRect(self):
-        return QRectF(-self.size, -self.size, self.size * 2, self.size * 2)
-
-    def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        # Warna Biru
-        painter.setBrush(QBrush(QColor("#1d4ed8")))
-        painter.setPen(QPen(Qt.white, 2))
-        painter.drawEllipse(-self.size/2, -self.size/2, self.size, self.size)
-
-        # Teks "T"
-        painter.setPen(QPen(Qt.white))
-        font = QFont("Arial", 8, QFont.Bold)
-        painter.setFont(font)
-        painter.drawText(QRectF(-self.size/2, -self.size/2, self.size, self.size), Qt.AlignCenter, "T")
-
-        if self.isSelected():
-            painter.setPen(QPen(QColor("#f4b400"), 2))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawEllipse(-self.size/2 - 2, -self.size/2 - 2, self.size + 4, self.size + 4)
