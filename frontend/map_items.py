@@ -8,10 +8,8 @@ from PySide6.QtSvg import QSvgRenderer
 
 _SVG_CACHE = {}
 
-# KAMUS DIPERBARUI: Memastikan semua variasi nama & kode ICAO masuk
 AIRCRAFT_CATEGORIES = {
-    "an225": ["AN-225", "A225"],
-    "concorde": ["CONCORDE", "CONC"],
+    "an225": ["AN-225", "A225"], "concorde": ["CONCORDE", "CONC"],
     "four_engine_wing_on_top": ["DREAMLIFTER", "BLCF", "A124", "C-17", "C17"],
     "glider": ["GLIDER", "GLID"],
     "light_aircraft": ["CESSNA", "C172", "C182", "C208", "C402", "SR22", "DA40", "DA50", "DA62", "PA28", "P28A", "P28B", "TBM", "PC12", "EXTRA", "E300", "WRIGHT", "CAPRONI", "PIPER", "CUB"],
@@ -24,41 +22,29 @@ AIRCRAFT_CATEGORIES = {
 }
 
 def load_icons(icons_dir="assets/icons"):
-    if not os.path.exists(icons_dir):
-        return
-
+    if not os.path.exists(icons_dir): return
     for filename in os.listdir(icons_dir):
         if filename.endswith(".svg"):
             name = filename[:-4]
-            path = os.path.join(icons_dir, filename)
-            renderer = QSvgRenderer(path)
-            if renderer.isValid():
-                _SVG_CACHE[name] = renderer
+            renderer = QSvgRenderer(os.path.join(icons_dir, filename))
+            if renderer.isValid(): _SVG_CACHE[name] = renderer
 
 def get_icon_for_aircraft(ac_type):
     if not ac_type: return None
-    ac_type_upper = ac_type.upper().replace(" ", "") # Hapus spasi untuk pencocokan lebih baik
-
+    ac_type_upper = ac_type.upper().replace(" ", "")
     for icon_name, keywords in AIRCRAFT_CATEGORIES.items():
         for kw in keywords:
-            if kw.replace(" ", "") in ac_type_upper:
-                return icon_name
+            if kw.replace(" ", "") in ac_type_upper: return icon_name
     return None
 
-# ==========================================
-# CLASS PESAWAT (UKURAN TETAP DI LAYAR)
-# ==========================================
 class AircraftItem(QGraphicsItem):
     def __init__(self, callsign, aircraft_type=""):
         super().__init__()
         self.callsign = callsign
         self.aircraft_type = aircraft_type
         self.heading = 0
-
-        # Ukuran tetap di layar
         self.size = 8
         self.icon_size = 20
-
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
         self.setTransformOriginPoint(0, 0)
@@ -71,9 +57,7 @@ class AircraftItem(QGraphicsItem):
             self.heading = heading
             self.setRotation(self.heading)
 
-    def boundingRect(self):
-        return QRectF(-15, -15, 30, 30)
-
+    def boundingRect(self): return QRectF(-15, -15, 30, 30)
     def shape(self):
         path = QPainterPath()
         path.addEllipse(QRectF(-15, -15, 30, 30))
@@ -98,17 +82,11 @@ class AircraftItem(QGraphicsItem):
             painter.setBrush(QBrush(QColor("#f4b400")))
             painter.setPen(QPen(QColor("#000000"), 1))
             s = self.size
-            polygon = QPolygonF([
-                QPointF(0, -s * 1.2),
-                QPointF(s * 0.8, s * 1.0),
-                QPointF(0, s * 0.6),
-                QPointF(-s * 0.8, s * 1.0)
-            ])
-            painter.drawPolygon(polygon)
+            painter.drawPolygon(QPolygonF([
+                QPointF(0, -s * 1.2), QPointF(s * 0.8, s * 1.0),
+                QPointF(0, s * 0.6), QPointF(-s * 0.8, s * 1.0)
+            ]))
 
-# ==========================================
-# CLASS TRAIL (GRADASI WARNA KETINGGIAN)
-# ==========================================
 class TrailItem(QGraphicsItem):
     def __init__(self):
         super().__init__()
@@ -116,7 +94,21 @@ class TrailItem(QGraphicsItem):
         self.trail_points = []
 
     def set_points(self, points):
-        self.trail_points = points
+        # Smoothing (Moving Average)
+        if len(points) < 3:
+            self.trail_points = points
+            self.update()
+            return
+
+        smoothed = [points[0]]
+        for i in range(1, len(points) - 1):
+            x = (points[i-1]["x"] + points[i]["x"] + points[i+1]["x"]) / 3.0
+            y = (points[i-1]["y"] + points[i]["y"] + points[i+1]["y"]) / 3.0
+            alt = (points[i-1]["alt"] + points[i]["alt"] + points[i+1]["alt"]) / 3.0
+            smoothed.append({"x": x, "y": y, "alt": alt})
+        smoothed.append(points[-1])
+
+        self.trail_points = smoothed
         self.update()
 
     def boundingRect(self):
@@ -131,48 +123,54 @@ class TrailItem(QGraphicsItem):
         if len(self.trail_points) < 2: return
         painter.setRenderHint(QPainter.Antialiasing)
 
+        line_width = 2.0
+        radius = line_width / 2.0
+
         for i in range(1, len(self.trail_points)):
             p1 = self.trail_points[i-1]
             p2 = self.trail_points[i]
 
             avg_alt = (p1["alt"] + p2["alt"]) / 2.0
             color = self._get_smooth_color(avg_alt)
+            color.setAlpha(255) # Anti pudar
 
             pen = QPen(color)
-            pen.setWidth(3)
+            pen.setWidthF(line_width)
             pen.setCosmetic(True)
-            pen.setCapStyle(Qt.RoundCap)
+            pen.setCapStyle(Qt.FlatCap) # Cegah tebal di ujung
             pen.setJoinStyle(Qt.RoundJoin)
             painter.setPen(pen)
 
-            painter.drawLine(
-                QPointF(p1["x"] / 100.0, p1["y"] / 100.0),
-                QPointF(p2["x"] / 100.0, p2["y"] / 100.0)
-            )
+            pt1 = QPointF(p1["x"] / 100.0, p1["y"] / 100.0)
+            pt2 = QPointF(p2["x"] / 100.0, p2["y"] / 100.0)
+
+            painter.drawLine(pt1, pt2)
+
+            # Titik manis di sambungan (Bikin smooth)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(color))
+            painter.drawEllipse(pt1, radius, radius)
+
+        if self.trail_points:
+            p_start = self.trail_points[0]
+            start_color = self._get_smooth_color(p_start["alt"])
+            start_color.setAlpha(255)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(start_color))
+            painter.drawEllipse(QPointF(p_start["x"] / 100.0, p_start["y"] / 100.0), radius, radius)
 
     def _get_smooth_color(self, alt):
         keys = [
-            (0, 255, 255, 255),      # Putih
-            (300, 255, 255, 255),    # Putih
-            (1500, 244, 180, 0),     # Kuning
-            (3000, 76, 175, 80),     # Hijau
-            (4500, 0, 188, 212),     # Biru Muda
-            (6000, 33, 150, 243),    # Biru Tua
-            (7000, 156, 39, 176),    # Ungu
-            (8000, 244, 67, 54)      # Merah
+            (0, 255, 255, 255), (1000, 244, 180, 0), (2500, 76, 175, 80),
+            (4000, 0, 188, 212), (5500, 33, 150, 243), (7000, 156, 39, 176), (9000, 244, 67, 54)
         ]
-
         if alt <= 0: return QColor(255, 255, 255)
-        if alt >= 8000: return QColor(244, 67, 54)
+        if alt >= 9000: return QColor(244, 67, 54)
 
         for i in range(len(keys) - 1):
             alt1, r1, g1, b1 = keys[i]
             alt2, r2, g2, b2 = keys[i+1]
             if alt1 <= alt <= alt2:
                 ratio = (alt - alt1) / (alt2 - alt1)
-                r = int(r1 + (r2 - r1) * ratio)
-                g = int(g1 + (g2 - g1) * ratio)
-                b = int(b1 + (b2 - b1) * ratio)
-                return QColor(r, g, b)
-
+                return QColor(int(r1 + (r2 - r1) * ratio), int(g1 + (g2 - g1) * ratio), int(b1 + (b2 - b1) * ratio))
         return QColor(255, 255, 255)
