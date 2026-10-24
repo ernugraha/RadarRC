@@ -4,7 +4,7 @@ import os
 import time
 from PySide6.QtWidgets import QMainWindow, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QFrame
 from PySide6.QtGui import QColor, QPen, QPixmap, QTransform
-from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
+from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QRectF
 
 from frontend.styles import MAIN_STYLESHEET
 from frontend.ui_components import TopBar, Sidebar, BottomToolbar, MapControls, FlightInfoPanel
@@ -62,7 +62,6 @@ class MainWindow(QMainWindow):
         query = query.lower()
         matched_callsign = None
         for callsign, info in self.current_data.items():
-            # Cari berdasarkan Callsign atau ICAO
             if query in callsign.lower() or query in f"{get_airline_icao(callsign)}{callsign.split('-')[-1]}".lower() or query in info.get("aircraftType", "").lower() or query in info.get("playerName", "").lower():
                 matched_callsign = callsign
                 break
@@ -77,8 +76,6 @@ class MainWindow(QMainWindow):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
-
-        # UBAH DI SINI: Naikkan jadi 750px (atau sesuaikan tinggi layar)
         panel_height = min(750, h - 120)
 
         self.sidebar.setGeometry(20, 100, 340, panel_height)
@@ -166,7 +163,6 @@ class MainWindow(QMainWindow):
         self.current_data = data_dict
         active_callsigns = set(data_dict.keys())
 
-        # 1. Tambah/Update Pesawat
         for callsign, info in data_dict.items():
             if "x" not in info or "y" not in info: continue
             x, y = info["x"], info["y"]
@@ -174,40 +170,39 @@ class MainWindow(QMainWindow):
             alt = info.get("altitude", 0)
             ac_type = info.get("aircraftType", "")
 
+            icao = get_airline_icao(callsign)
+            flight_num = callsign.split("-")[-1] if "-" in callsign else ""
+            label_text = f"{icao}{flight_num}" if icao != "???" else callsign
+
             if callsign not in self.aircraft_items:
                 plane = AircraftItem(callsign, ac_type)
                 self.scene.addItem(plane)
                 self.aircraft_items[callsign] = plane
 
-            self.aircraft_items[callsign].update_data(x, y, heading, ac_type)
+            self.aircraft_items[callsign].update_data(x, y, heading, ac_type, label_text)
             self.trail_manager.add_point(callsign, x, y, alt)
 
-        # 2. Hapus Pesawat Hantu (Yang sudah keluar dari server)
         for callsign in list(self.aircraft_items.keys()):
             if callsign not in active_callsigns:
                 item = self.aircraft_items.pop(callsign)
                 self.scene.removeItem(item)
 
-        # 3. Sinkronisasi Trail ke Database
         self.trail_manager.sync_to_db()
         self.trail_manager.cleanup(active_callsigns)
 
-        # 4. Perbarui Trail yang sedang aktif dipilih
         selected_items = self.scene.selectedItems()
-        if selected_items and isinstance(selected_items[0], AircraftItem):
-            selected_cs = selected_items[0].callsign
+        selected_callsign = selected_items[0].callsign if (selected_items and isinstance(selected_items[0], AircraftItem)) else None
 
-            # Jika pesawat yang dipilih tiba-tiba hilang
-            if selected_cs not in active_callsigns:
+        if selected_callsign:
+            if selected_callsign not in active_callsigns:
                 self.scene.clearSelection()
                 if self.current_trail_item:
                     self.scene.removeItem(self.current_trail_item)
                     self.current_trail_item = None
             elif self.current_trail_item:
-                trail_points = self.trail_manager.get_trail(selected_cs)
+                trail_points = self.trail_manager.get_trail(selected_callsign)
                 self.current_trail_item.set_points(trail_points)
 
-        # 5. Update Sidebar
         now = time.time()
         if now - self.last_sidebar_update > 1.0:
             self.sidebar.update_data(data_dict)

@@ -4,60 +4,48 @@ import json
 import asyncio
 import websockets
 from PySide6.QtCore import QObject, Signal
-from backend.flight_plan_store import FlightPlanStore # IMPORT STORE BARU
+from backend.flight_plan_store import FlightPlanStore
 
 class DataClient(QObject):
     aircraft_data_received = Signal(dict)
+    controllers_data_received = Signal(dict)
+    atis_data_received = Signal(dict)
     connection_status = Signal(str)
 
     def __init__(self):
         super().__init__()
         self.ws_url = "wss://24data.ptfs.app/wss"
         self.is_running = False
-
-        # Inisialisasi Database
         self.plan_store = FlightPlanStore()
-
         self.reconnect_delay = 3
         self._last_cleanup_time = 0
 
     def process_aircraft(self, payload):
-        if not isinstance(payload, dict):
-            return {}
-
+        # ... (Sama seperti sebelumnya) ...
+        if not isinstance(payload, dict): return {}
         result = {}
         active_callsigns = set()
 
         for callsign, ac in payload.items():
-            if not isinstance(ac, dict):
-                continue
-
+            if not isinstance(ac, dict): continue
             active_callsigns.add(callsign)
             pos = ac.get("position", {})
             entry = {
-                "x": float(pos.get("x", 0)),
-                "y": float(pos.get("y", 0)),
-                "heading": float(ac.get("heading", 0)),
-                "altitude": float(ac.get("altitude", 0)),
-                "playerName": ac.get("playerName", ""),
-                "aircraftType": ac.get("aircraftType", ""),
-                "speed": float(ac.get("speed", 0)),
-                "isOnGround": bool(ac.get("isOnGround", False)),
+                "x": float(pos.get("x", 0)), "y": float(pos.get("y", 0)),
+                "heading": float(ac.get("heading", 0)), "altitude": float(ac.get("altitude", 0)),
+                "playerName": ac.get("playerName", ""), "aircraftType": ac.get("aircraftType", ""),
+                "speed": float(ac.get("speed", 0)), "isOnGround": bool(ac.get("isOnGround", False)),
             }
-
-            # Ambil flight plan dari DATABASE (bukan memori)
             plan = self.plan_store.get_plan(callsign)
             if plan:
                 entry["plan_departing"] = plan.get("departing", "")
                 entry["plan_arriving"] = plan.get("arriving", "")
                 entry["plan_route"] = plan.get("route", "")
-
             result[callsign] = entry
 
-        # Jalankan pembersihan database setiap 30 detik sekali
         now = asyncio.get_event_loop().time()
         if now - self._last_cleanup_time > 30:
-            self.plan_store.cleanup_stale_data(active_callsigns) # Ganti nama fungsi
+            self.plan_store.cleanup_stale_data(active_callsigns)
             self._last_cleanup_time = now
 
         return result
@@ -68,12 +56,7 @@ class DataClient(QObject):
         while self.is_running:
             self.connection_status.emit("[INFO] Connecting to 24Data API...")
             try:
-                async with websockets.connect(
-                    self.ws_url,
-                    origin=None,
-                    ping_interval=20,
-                    ping_timeout=20
-                ) as websocket:
+                async with websockets.connect(self.ws_url, origin=None, ping_interval=20, ping_timeout=20) as websocket:
                     self.connection_status.emit("[SUCCESS] Connected to 24Data WebSocket.")
                     self.reconnect_delay = 3
 
@@ -92,11 +75,32 @@ class DataClient(QObject):
                                 callsign = plan_data.get("callsign")
                                 if callsign:
                                     self.plan_store.save_plan(callsign, plan_data)
+                                    # LOGGING BARU
+                                    dep = plan_data.get("departing", "N/A")
+                                    arr = plan_data.get("arriving", "N/A")
+                                    print(f"[FLIGHT PLAN RECEIVED] {callsign} -> {dep} to {arr}")
+
+                            elif event_type == "CONTROLLERS":
+                                controllers = data.get("d", [])
+                                parsed = {}
+                                for c in controllers:
+                                    if c.get("holder"):
+                                        apt = c.get("airport")
+                                        pos = c.get("position")
+                                        if apt not in parsed: parsed[apt] = {}
+                                        parsed[apt][pos] = c.get("holder")
+                                self.controllers_data_received.emit(parsed)
+
+                            elif event_type == "ATIS":
+                                atis_list = data.get("d", [])
+                                parsed_atis = {}
+                                for a in atis_list:
+                                    parsed_atis[a.get("airport")] = a
+                                self.atis_data_received.emit(parsed_atis)
 
                         except websockets.exceptions.ConnectionClosed:
                             self.connection_status.emit("[WARNING] Connection closed. Reconnecting...")
                             break
-
             except Exception as e:
                 self.connection_status.emit(f"[ERROR] Connection failed: {e}")
 

@@ -3,7 +3,7 @@
 import os
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QPainter, QPolygonF, QBrush, QColor, QPen, QPainterPath
+from PySide6.QtGui import QPainter, QPolygonF, QBrush, QColor, QPen, QPainterPath, QFont
 from PySide6.QtSvg import QSvgRenderer
 
 _SVG_CACHE = {}
@@ -45,19 +45,38 @@ class AircraftItem(QGraphicsItem):
         self.heading = 0
         self.size = 8
         self.icon_size = 20
+
+        self.is_hovered = False
+        self.label_text = callsign.split("-")[0] if "-" in callsign else callsign
+
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+        self.setAcceptHoverEvents(True)
         self.setTransformOriginPoint(0, 0)
 
-    def update_data(self, x, y, heading, aircraft_type=""):
+    def hoverEnterEvent(self, event):
+        self.is_hovered = True
+        self.update()
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self.is_hovered = False
+        self.update()
+        super().hoverLeaveEvent(event)
+
+    def update_data(self, x, y, heading, aircraft_type="", label_text=""):
         self.setPos(x / 100.0, y / 100.0)
         if aircraft_type and self.aircraft_type != aircraft_type:
             self.aircraft_type = aircraft_type
+        if label_text:
+            self.label_text = label_text
         if self.heading != heading:
             self.heading = heading
             self.setRotation(self.heading)
 
-    def boundingRect(self): return QRectF(-15, -15, 30, 30)
+    def boundingRect(self):
+        return QRectF(-150, -150, 300, 300)
+
     def shape(self):
         path = QPainterPath()
         path.addEllipse(QRectF(-15, -15, 30, 30))
@@ -87,6 +106,30 @@ class AircraftItem(QGraphicsItem):
                 QPointF(0, s * 0.6), QPointF(-s * 0.8, s * 1.0)
             ]))
 
+        if self.isSelected() or self.is_hovered:
+            painter.save()
+            painter.rotate(-self.heading)
+
+            font = QFont("Arial", 8, QFont.Bold)
+            painter.setFont(font)
+
+            metrics = painter.fontMetrics()
+            text_width = metrics.horizontalAdvance(self.label_text) + 8
+            text_height = metrics.height() + 2
+
+            label_x = 10
+            label_y = -text_height / 2
+
+            label_rect = QRectF(label_x, label_y, text_width, text_height)
+            painter.setPen(QPen(QColor(180, 180, 180), 1))
+            painter.setBrush(QBrush(QColor(255, 255, 255, 230)))
+            painter.drawRoundedRect(label_rect, 3, 3)
+
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
+
+            painter.restore()
+
 class TrailItem(QGraphicsItem):
     def __init__(self):
         super().__init__()
@@ -99,29 +142,22 @@ class TrailItem(QGraphicsItem):
             self.update()
             return
 
-        # ALGORITMA CHAIKIN (Corner Cutting)
-        # Menghaluskan seluruh titik, termasuk data paling lama (ekor)
         pts = points
-        for _ in range(2): # Lakukan 2 iterasi agar mulus sempurna
+        for _ in range(2):
             new_pts = []
-            new_pts.append(pts[0]) # Pertahankan titik awal
+            new_pts.append(pts[0])
             for i in range(len(pts) - 1):
                 p0 = pts[i]
                 p1 = pts[i+1]
-
-                # Rumus Chaikin: 75% titik awal + 25% titik akhir
                 q_x = p0["x"] * 0.75 + p1["x"] * 0.25
                 q_y = p0["y"] * 0.75 + p1["y"] * 0.25
                 q_alt = p0["alt"] * 0.75 + p1["alt"] * 0.25
-
-                # Rumus Chaikin: 25% titik awal + 75% titik akhir
                 r_x = p0["x"] * 0.25 + p1["x"] * 0.75
                 r_y = p0["y"] * 0.25 + p1["y"] * 0.75
                 r_alt = p0["alt"] * 0.25 + p1["alt"] * 0.75
-
                 new_pts.append({"x": q_x, "y": q_y, "alt": q_alt})
                 new_pts.append({"x": r_x, "y": r_y, "alt": r_alt})
-            new_pts.append(pts[-1]) # Pertahankan titik akhir
+            new_pts.append(pts[-1])
             pts = new_pts
 
         self.trail_points = pts
@@ -141,8 +177,6 @@ class TrailItem(QGraphicsItem):
 
         line_width = 3.0
 
-        # Karena titiknya sudah sangat rapat dan halus (dari Chaikin),
-        # kita hanya perlu menggambar garis lurus antar titik.
         for i in range(1, len(self.trail_points)):
             p1 = self.trail_points[i-1]
             p2 = self.trail_points[i]
