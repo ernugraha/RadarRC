@@ -2,7 +2,7 @@
 
 MAIN_STYLESHEET = """
 QMainWindow {
-    background-color: #121212;
+    background-color: #131313;
 }
 QWidget {
     color: #e0e0e0;
