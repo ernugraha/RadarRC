@@ -23,9 +23,6 @@ AIRCRAFT_CATEGORIES = {
 }
 
 def load_icons(icons_dir="assets/icons"):
-    if not os.path.exists(icons_dir):
-        print(f"[WARNING] Folder ikon tidak ditemukan: {icons_dir}")
-        return
 
     for filename in os.listdir(icons_dir):
         if filename.endswith(".svg"):
@@ -34,8 +31,6 @@ def load_icons(icons_dir="assets/icons"):
             renderer = QSvgRenderer(path)
             if renderer.isValid():
                 _SVG_CACHE[name] = renderer
-
-    print(f"[INFO] Berhasil memuat {len(_SVG_CACHE)} ikon pesawat (Vector).")
 
 def get_icon_for_aircraft(ac_type):
     if not ac_type: return None
