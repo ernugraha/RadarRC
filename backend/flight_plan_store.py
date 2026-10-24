@@ -23,7 +23,6 @@ class FlightPlanStore:
                     plan_data TEXT
                 )
             """)
-            # Trail tetap menggunakan callsign
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS trails (
                     callsign TEXT PRIMARY KEY,
@@ -36,17 +35,28 @@ class FlightPlanStore:
     def save_plan(self, roblox_name, plan_data):
         if not roblox_name: return
         try:
+            # Paksa huruf kecil untuk konsistensi
+            r_name_lower = roblox_name.lower()
             plan_data["_saved_at"] = time.time()
+
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute("INSERT OR REPLACE INTO plans (roblox_name, plan_data) VALUES (?, ?)", (roblox_name, json.dumps(plan_data)))
+                conn.execute("INSERT OR REPLACE INTO plans (roblox_name, plan_data) VALUES (?, ?)",
+                             (r_name_lower, json.dumps(plan_data)))
                 conn.commit()
-        except: pass
+            print(f"[DATABASE] Berhasil simpan plan untuk user: {r_name_lower}")
+        except Exception as e:
+            print(f"[DATABASE ERROR] Gagal simpan plan: {e}")
 
     def get_plan(self, roblox_name):
         if not roblox_name: return None
-        with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute("SELECT plan_data FROM plans WHERE roblox_name = ?", (roblox_name,)).fetchone()
-            if row: return json.loads(row[0])
+        try:
+            r_name_lower = roblox_name.lower()
+            with sqlite3.connect(self.db_path) as conn:
+                row = conn.execute("SELECT plan_data FROM plans WHERE roblox_name = ?", (r_name_lower,)).fetchone()
+                if row:
+                    return json.loads(row[0])
+        except Exception as e:
+            print(f"[DATABASE ERROR] Gagal ambil plan: {e}")
         return None
 
     # --- TRAILS ---
@@ -68,21 +78,21 @@ class FlightPlanStore:
     def cleanup_stale_data(self, active_usernames, active_callsigns):
         if not active_usernames or not active_callsigns: return
         now = time.time()
+        active_names_lower = [u.lower() for u in active_usernames]
 
         with sqlite3.connect(self.db_path) as conn:
-            # Hapus plan jika usernamenya tidak aktif DAN umurnya lebih dari 2 jam
             all_plans = conn.execute("SELECT roblox_name, plan_data FROM plans").fetchall()
             to_del_plans = []
             for r_name, plan_json in all_plans:
-                if r_name not in active_usernames:
+                if r_name not in active_names_lower:
                     plan = json.loads(plan_json)
+                    # Hapus jika umur plan > 2 jam
                     if now - plan.get("_saved_at", 0) > 7200:
                         to_del_plans.append(r_name)
 
             if to_del_plans:
                 conn.execute(f"DELETE FROM plans WHERE roblox_name IN ({','.join('?'*len(to_del_plans))})", to_del_plans)
 
-            # Hapus trail jika callsign tidak aktif
             all_trails = [r[0] for r in conn.execute("SELECT callsign FROM trails").fetchall()]
             to_del_trails = [cs for cs in all_trails if cs not in active_callsigns]
             if to_del_trails:

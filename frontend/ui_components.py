@@ -98,18 +98,14 @@ class FlightPanel(QFrame):
         self.lbl_type.setText(ac_type)
         self.lbl_speed.setText(f"{int(info.get('speed', 0))} kts")
 
-        # Di sidebar, kita gabungkan kode dan nama (misal: IRFD - Greater Rockford)
+        # HANYA KODE ICAO SAJA
         dep_code = info.get("plan_departing", "")
         arr_code = info.get("plan_arriving", "")
 
-        dep_name = get_airport_name(dep_code) if dep_code else "N/A"
-        arr_name = get_airport_name(arr_code) if arr_code else "N/A"
-
-        # Jika nama terlalu panjang, potong
-        if len(dep_name) > 15: dep_name = dep_name[:13] + ".."
-        if len(arr_name) > 15: arr_name = arr_name[:13] + ".."
-
-        self.lbl_route.setText(f"{dep_code} {dep_name} - {arr_code} {arr_name}" if dep_code else "N/A - N/A")
+        if dep_code and arr_code:
+            self.lbl_route.setText(f"{dep_code} - {arr_code}")
+        else:
+            self.lbl_route.setText("N/A - N/A")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton: self.clicked.emit(self.original_callsign)

@@ -83,12 +83,14 @@ class DataClient(QObject):
                                 plan_data = data.get("d", {})
                                 roblox_name = plan_data.get("robloxName")
                                 if roblox_name:
+                                    # Simpan ke DB
                                     self.plan_store.save_plan(roblox_name, plan_data)
                                     dep = plan_data.get("departing", "N/A")
                                     arr = plan_data.get("arriving", "N/A")
                                     print(f"[FLIGHT PLAN RECEIVED] {roblox_name} -> {dep} to {arr}")
+                                else:
+                                    print(f"[FLIGHT PLAN WARNING] Diterima plan tanpa robloxName: {plan_data}")
 
-                            # ... (Controllers dan ATIS biarkan sama) ...
                             elif event_type == "CONTROLLERS":
                                 controllers = data.get("d", [])
                                 parsed = {}
