@@ -16,6 +16,14 @@ class MapView(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setFocusPolicy(Qt.StrongFocus)
 
+    def mousePressEvent(self, event):
+        # Jika klik kiri dan bukan pada pesawat, bersihkan seleksi
+        if event.button() == Qt.LeftButton:
+            item = self.itemAt(event.pos())
+            if item is None or not hasattr(item, 'callsign'):
+                self.scene().clearSelection()
+        super().mousePressEvent(event)
+
     def wheelEvent(self, event):
         zoom_in_factor = 1.25
         zoom_out_factor = 0.8
@@ -29,19 +37,3 @@ class MapView(QGraphicsView):
 
     def zoom_out(self):
         self.scale(0.8, 0.8)
-
-    def keyPressEvent(self, event):
-        step = 50
-        h_bar = self.horizontalScrollBar()
-        v_bar = self.verticalScrollBar()
-
-        if event.key() == Qt.Key_Left:
-            h_bar.setValue(h_bar.value() - step)
-        elif event.key() == Qt.Key_Right:
-            h_bar.setValue(h_bar.value() + step)
-        elif event.key() == Qt.Key_Up:
-            v_bar.setValue(v_bar.value() - step)
-        elif event.key() == Qt.Key_Down:
-            v_bar.setValue(v_bar.value() + step)
-        else:
-            super().keyPressEvent(event)

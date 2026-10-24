@@ -23,11 +23,57 @@ class TopBar(QWidget):
         layout.addStretch()
         layout.addWidget(view_btn)
 
+class FlightPanel(QFrame):
+    """Panel individual yang mengupdate teksnya sendiri (Anti-Crash)."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("FlightPanel")
+        self.setFixedHeight(65)
+        p_layout = QVBoxLayout(self)
+        p_layout.setContentsMargins(10, 8, 10, 8)
+        p_layout.setSpacing(2)
+
+        # Baris 1
+        row1 = QHBoxLayout()
+        self.lbl_callsign = QLabel("CALLSIGN")
+        self.lbl_callsign.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
+
+        self.lbl_type = QLabel("TYPE")
+        self.lbl_type.setStyleSheet("color: #aaa; font-size: 11px; font-weight: bold; margin-left: 5px;")
+
+        self.lbl_alt = QLabel("0000")
+        self.lbl_alt.setObjectName("AccentText")
+
+        row1.addWidget(self.lbl_callsign)
+        row1.addWidget(self.lbl_type)
+        row1.addStretch()
+        row1.addWidget(self.lbl_alt)
+
+        # Baris 2
+        self.lbl_route = QLabel("N/A - N/A")
+        self.lbl_route.setObjectName("SubText")
+
+        p_layout.addLayout(row1)
+        p_layout.addWidget(self.lbl_route)
+
+    def set_data(self, callsign, info):
+        clean_callsign = callsign.split("-")[0] if "-" in callsign else callsign
+        self.lbl_callsign.setText(clean_callsign)
+
+        ac_type = info.get("aircraftType", "Unknown")
+        self.lbl_type.setText(ac_type.upper())
+
+        alt = info.get("altitude", 0)
+        self.lbl_alt.setText(f"{int(alt):,}")
+
+        dep = info.get("plan_departing", "N/A")
+        arr = info.get("plan_arriving", "N/A")
+        self.lbl_route.setText(f"{dep} - {arr}")
+
 class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedSize(340, 600) # Sedikit lebih lebar agar muat teks
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
@@ -47,65 +93,28 @@ class Sidebar(QFrame):
         self.list_layout.setSpacing(8)
         self.list_layout.setAlignment(Qt.AlignTop)
 
+        # KUNCI: Pre-allocate 30 panel di awal. Tidak akan pernah dihapus.
+        self.panels = []
+        for _ in range(30):
+            p = FlightPanel()
+            self.panels.append(p)
+            self.list_layout.addWidget(p)
+            p.hide() # Sembunyikan dulu
+
         self.scroll_area.setWidget(self.list_widget)
         layout.addWidget(self.scroll_area)
 
     def update_data(self, data_dict):
-        # PERBAIKAN CRASH: Gunakan deleteLater(), jangan setParent(None)
-        for i in reversed(range(self.list_layout.count())):
-            widget_to_remove = self.list_layout.itemAt(i).widget()
-            if widget_to_remove:
-                widget_to_remove.deleteLater()
+        # Urutkan berdasarkan ketinggian tertinggi
+        sorted_data = sorted(data_dict.items(), key=lambda x: x[1].get("altitude", 0), reverse=True)
 
-        # Top 20 berdasarkan ketinggian
-        sorted_data = sorted(data_dict.items(), key=lambda x: x[1].get("altitude", 0), reverse=True)[:20]
-
-        for i, (callsign, info) in enumerate(sorted_data):
-            panel = self.create_flight_panel(callsign, info)
-            self.list_layout.addWidget(panel)
-
-    def create_flight_panel(self, callsign, info):
-        panel = QFrame()
-        panel.setObjectName("FlightPanel")
-        panel.setFixedHeight(65)
-        p_layout = QVBoxLayout(panel)
-        p_layout.setContentsMargins(10, 8, 10, 8)
-        p_layout.setSpacing(4)
-
-        # --- BARIS 1: Callsign, Badge, Altitude ---
-        row1 = QHBoxLayout()
-        lbl_callsign = QLabel(callsign.split("-")[0] if "-" in callsign else callsign)
-        lbl_callsign.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
-
-        ac_type = info.get("aircraftType", "Unknown")
-        # Ambil 4 huruf pertama tipe pesawat sebagai badge
-        badge_text = ac_type[:4].upper() if ac_type else "UNKN"
-        lbl_badge = QLabel(badge_text)
-        lbl_badge.setObjectName("BadgeBlue")
-
-        alt = info.get("altitude", 0)
-        lbl_alt = QLabel(f"{int(alt):,}")
-        lbl_alt.setObjectName("AccentText")
-
-        row1.addWidget(lbl_callsign)
-        row1.addWidget(lbl_badge)
-        row1.addStretch()
-        row1.addWidget(lbl_alt)
-
-        # --- BARIS 2: Rute ---
-        row2 = QHBoxLayout()
-        dep = info.get("plan_departing", "N/A")
-        arr = info.get("plan_arriving", "N/A")
-
-        lbl_route = QLabel(f"{dep} - {arr}")
-        lbl_route.setObjectName("SubText")
-
-        row2.addWidget(lbl_route)
-        row2.addStretch()
-
-        p_layout.addLayout(row1)
-        p_layout.addLayout(row2)
-        return panel
+        for i, panel in enumerate(self.panels):
+            if i < len(sorted_data):
+                callsign, info = sorted_data[i]
+                panel.set_data(callsign, info)
+                panel.show() # Tampilkan
+            else:
+                panel.hide() # Sembunyikan jika data kurang dari 30
 
 class FlightInfoPanel(QFrame):
     closed = Signal()
@@ -113,7 +122,6 @@ class FlightInfoPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedSize(340, 600)
         self.setVisible(False)
 
         layout = QVBoxLayout(self)
@@ -140,10 +148,17 @@ class FlightInfoPanel(QFrame):
         layout.addStretch()
 
     def set_flight_data(self, callsign, info):
-        for i in reversed(range(self.content_layout.count())):
-            widget_to_remove = self.content_layout.itemAt(i).widget()
-            if widget_to_remove:
-                widget_to_remove.deleteLater()
+        # Bersihkan layout dengan aman
+        while self.content_layout.count():
+            item = self.content_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    subitem = item.layout().takeAt(0)
+                    if subitem.widget():
+                        subitem.widget().deleteLater()
+                item.layout().deleteLater()
 
         self.lbl_title.setText(f"INFO: {callsign}")
 
