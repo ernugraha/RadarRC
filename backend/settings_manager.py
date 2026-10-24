@@ -14,15 +14,11 @@ class SettingsManager:
             try:
                 with open(self.path, "r") as f:
                     return json.load(f)
-            except:
-                pass
+            except: pass
         return {
-            "window_width": 1400,
-            "window_height": 900,
-            "sidebar_visible": True,
-            "show_boundaries": True,
-            "show_trails": True,
-            "show_labels": False
+            "window_width": 1400, "window_height": 900,
+            "sidebar_visible": True, "show_boundaries": True,
+            "show_trails": True, "show_labels": False
         }
 
     def save(self, data):
