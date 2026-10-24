@@ -200,9 +200,23 @@ class FlightInfoPanel(QFrame):
         super().__init__(parent)
         self.setObjectName("InfoPanel")
         self.setVisible(False)
-        main_layout = QVBoxLayout(self)
+
+        # --- SCROLL AREA DITAMBAHKAN DI SINI ---
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet("background: transparent; border: none;")
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        content = QWidget()
+        content.setStyleSheet("background: transparent;")
+        main_layout = QVBoxLayout(content)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
+        # ---------------------------------------
 
         # HEADER
         header_frame = QFrame()
@@ -293,7 +307,7 @@ class FlightInfoPanel(QFrame):
         self.val_vs  = self.create_telemetry_box(tele_layout, 1, 1, "V/SPEED")
         main_layout.addWidget(telemetry_frame)
 
-        main_layout.addStretch()
+        # main_layout.addStretch() # DIHAPUS
 
         # PILOT
         pilot_frame = QFrame()
@@ -313,18 +327,37 @@ class FlightInfoPanel(QFrame):
         pilot_layout.addWidget(self.btn_pilot)
         main_layout.addWidget(pilot_frame)
 
+        # --- MASUKKAN KE SCROLL AREA ---
+        self.scroll.setWidget(content)
+        outer_layout.addWidget(self.scroll)
+
         self.current_pilot_name = "Unknown"
 
     def create_telemetry_box(self, layout, row, col, title):
         box = QFrame()
         box.setObjectName("TelemetryBox")
+        # KUNCI PERBAIKAN: Paksa style langsung di sini agar border tidak hilang di dalam QScrollArea
+        box.setStyleSheet("""
+            QFrame {
+                background-color: #222;
+                border: 1px solid #555;
+                border-radius: 6px;
+            }
+            QLabel {
+                border: none;
+                background: transparent;
+            }
+        """)
+
         box_layout = QVBoxLayout(box)
         box_layout.setContentsMargins(10, 8, 10, 8)
         box_layout.setSpacing(2)
+
         lbl_title = QLabel(title)
         lbl_title.setObjectName("DataLabel")
         lbl_val = QLabel("0")
         lbl_val.setObjectName("DataValue")
+
         box_layout.addWidget(lbl_title)
         box_layout.addWidget(lbl_val)
         layout.addWidget(box, row, col)
@@ -415,7 +448,19 @@ class AirportInfoPanel(QFrame):
         super().__init__(parent)
         self.setObjectName("InfoPanel")
         self.setVisible(False)
-        main_layout = QVBoxLayout(self)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet("background: transparent; border: none;")
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        content = QWidget()
+        content.setStyleSheet("background: transparent;")
+        main_layout = QVBoxLayout(content)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
@@ -488,7 +533,9 @@ class AirportInfoPanel(QFrame):
         atis_layout.addWidget(lbl_atis_title)
         atis_layout.addWidget(self.txt_atis)
         main_layout.addWidget(atis_frame)
-        main_layout.addStretch()
+
+        self.scroll.setWidget(content)
+        outer_layout.addWidget(self.scroll)
 
     def set_airport_data(self, icao, name, atc_info, atis_data):
         self.lbl_icao.setText(icao)
