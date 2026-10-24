@@ -89,7 +89,7 @@ class DataClient(QObject):
                                     arr = plan_data.get("arriving", "N/A")
                                     print(f"[FLIGHT PLAN RECEIVED] {roblox_name} -> {dep} to {arr}")
                                 else:
-                                    print(f"[FLIGHT PLAN WARNING] Diterima plan tanpa robloxName: {plan_data}")
+                                    print(f"[FLIGHT PLAN WARNING] No username detected: {plan_data}")
 
                             elif event_type == "CONTROLLERS":
                                 controllers = data.get("d", [])

@@ -18,7 +18,6 @@ class FlightPlanStore:
                 cursor = conn.execute("PRAGMA table_info(plans)")
                 columns = [col[1] for col in cursor.fetchall()]
                 if columns and "roblox_name" not in columns:
-                    print("[DATABASE] Skema lama terdeteksi. Memperbarui tabel plans...")
                     conn.execute("DROP TABLE plans")
             except Exception:
                 pass
@@ -49,7 +48,7 @@ class FlightPlanStore:
                 conn.execute("INSERT OR REPLACE INTO plans (roblox_name, plan_data) VALUES (?, ?)",
                              (r_name_lower, json.dumps(plan_data)))
                 conn.commit()
-            print(f"[DATABASE] Berhasil simpan plan untuk user: {r_name_lower}")
+            print(f"[DATABASE] Plan saved for: {r_name_lower}")
         except Exception as e:
             print(f"[DATABASE ERROR] Gagal simpan plan: {e}")
 
