@@ -36,6 +36,15 @@ def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
         if os.path.isfile(path): return path
     return None
 
+def find_airline_logo(callsign, logo_dir="assets/logos"):
+    if not os.path.exists(logo_dir): return None
+    airline_name = get_airline_name(callsign)
+    formatted_name = airline_name.replace(" ", "_").lower()
+    for filename in os.listdir(logo_dir):
+        if filename.endswith(".svg") and formatted_name in filename.lower():
+            return os.path.join(logo_dir, filename)
+    return None
+
 # ================= TOP BAR =================
 class TopBar(QWidget):
     search_triggered = Signal(str)
@@ -178,8 +187,11 @@ class FlightInfoPanel(QFrame):
         row1.addWidget(self.lbl_badge)
         row1.addStretch()
         row1.addWidget(btn_close)
+
         self.lbl_airline = QLabel("Airline Name")
         self.lbl_airline.setObjectName("InfoAirline")
+        self.lbl_airline.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
         header_layout.addLayout(row1)
         header_layout.addWidget(self.lbl_airline)
         main_layout.addWidget(header_frame)
@@ -281,11 +293,17 @@ class FlightInfoPanel(QFrame):
         real_airline = get_airline_name(callsign)
         self.lbl_callsign.setText(callsign)
         self.lbl_badge.setText(info.get("aircraftType", "Unknown").upper())
-        self.lbl_airline.setText(real_airline)
+
+        logo_path = find_airline_logo(callsign)
+        if logo_path:
+            # Format ke HTML agar logo bisa tampil di samping teks
+            self.lbl_airline.setText(f"<img src='{logo_path}' height='16' style='vertical-align:middle;'> &nbsp; {real_airline}")
+            self.lbl_airline.setTextFormat(Qt.RichText)
+        else:
+            self.lbl_airline.setText(real_airline)
 
         dep_code = info.get("plan_departing", "")
         arr_code = info.get("plan_arriving", "")
-
         self.lbl_dep.setText(dep_code if dep_code else "N/A")
         self.lbl_arr.setText(arr_code if arr_code else "N/A")
 

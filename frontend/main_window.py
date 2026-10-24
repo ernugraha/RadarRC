@@ -22,7 +22,9 @@ class MainWindow(QMainWindow):
         self.resize(1400, 900)
         self.setStyleSheet(MAIN_STYLESHEET)
 
-        load_icons("assets/icons")
+        # KUNCI PERBAIKAN: Memuat dari folder 'planes'
+        load_icons("assets/planes")
+
         self.aircraft_items = {}
         self.current_data = {}
         self.current_atis_data = {}
@@ -30,8 +32,6 @@ class MainWindow(QMainWindow):
 
         self.trail_manager = TrailManager(max_points=10000)
         self.current_trail_item = None
-
-        # State Auto-Follow
         self.follow_callsign = None
 
         # State Variables
@@ -91,7 +91,6 @@ class MainWindow(QMainWindow):
         self.info_panel.hide()
 
     def stop_following(self):
-        """Dipicu saat user menggeser peta secara manual."""
         self.follow_callsign = None
 
     def on_tool_clicked(self, tool_name):
@@ -253,15 +252,12 @@ class MainWindow(QMainWindow):
             self.scene.clearSelection()
             item.setSelected(True)
 
-            # KUNCI AUTO-FOLLOW & ZOOM
             self.follow_callsign = callsign
             current_zoom = self.view.transform().m11()
 
-            # Jika peta terlalu zoom out, zoom in perlahan
             if current_zoom < 2.0:
                 self.view.scale(2.0 / current_zoom, 2.0 / current_zoom)
 
-            # Meluncur ke pesawat
             self.view.smooth_center_on(item.pos())
 
     def close_flight_panel(self):
@@ -316,7 +312,6 @@ class MainWindow(QMainWindow):
                     self.info_panel.set_flight_data(callsign, self.current_data[callsign])
                     self.animate_panels(show_info=True)
 
-                    # Set follow mode aktif
                     self.follow_callsign = callsign
 
                     trail_points = self.trail_manager.get_trail(callsign)
@@ -325,7 +320,6 @@ class MainWindow(QMainWindow):
                         self.current_trail_item.set_points(trail_points)
                         self.scene.addItem(self.current_trail_item)
         else:
-            # Saat klik area kosong, matikan follow mode
             self.follow_callsign = None
             self.animate_panels(show_info=False)
 
@@ -360,10 +354,8 @@ class MainWindow(QMainWindow):
             self.aircraft_items[callsign].update_data(x, y, heading, ac_type, label_text)
             self.trail_manager.add_point(callsign, x, y, alt)
 
-        # KUNCI: Lakukan Auto-Follow setiap kali update
         if self.follow_callsign and self.follow_callsign in self.aircraft_items:
             item = self.aircraft_items[self.follow_callsign]
-            # Menggunakan centerOn langsung agar sangat responsif mengikuti pergerakan
             self.view.centerOn(item.pos())
 
         for callsign in list(self.aircraft_items.keys()):

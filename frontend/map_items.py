@@ -7,33 +7,89 @@ from PySide6.QtGui import QPainter, QPolygonF, QBrush, QColor, QPen, QPainterPat
 from PySide6.QtSvg import QSvgRenderer
 
 _SVG_CACHE = {}
-AIRCRAFT_CATEGORIES = {
-    "an225": ["AN-225", "A225"], "concorde": ["CONCORDE", "CONC"],
-    "four_engine_wing_on_top": ["DREAMLIFTER", "BLCF", "A124", "C-17", "C17"],
-    "glider": ["GLIDER", "GLID"],
-    "light_aircraft": ["CESSNA", "C172", "C182", "C208", "C402", "SR22", "DA40", "DA50", "DA62", "PA28", "P28A", "P28B", "TBM", "PC12", "EXTRA", "E300", "WRIGHT", "CAPRONI", "PIPER", "CUB"],
-    "narrow_body": ["A220", "A318", "A319", "A320", "A321", "707", "B707", "717", "B717", "727", "B727", "737", "B737", "B738", "B739", "B38M", "B39M", "757", "B752", "B753", "MD80", "MD90", "MD95", "COMET"],
-    "regional_jet": ["CRJ", "E170", "E175", "E190", "E195", "E290", "E295", "EMBRAER"],
-    "small_private_jet": ["LEARJET", "LJ", "CITATION", "C525", "C560", "C680", "C750", "GLF", "GLEX", "FA", "F900", "FALCON", "GLOBAL"],
-    "turboprop": ["ATR", "AT72", "AT75", "AT76", "Q400", "DH8D", "DHC6", "CARAVAN", "TWIN OTTER", "KINGAIR", "KING AIR", "BE20", "BE9L", "BE30", "B200", "B300", "B350", "AN-22", "AN-24", "AN-26", "AN-32"],
-    "widebody": ["A330", "A332", "A333", "A338", "A339", "A350", "A359", "A35K", "767", "B762", "B763", "B764", "777", "B772", "B773", "B77W", "B778", "B779", "787", "B788", "B789", "B78X", "L-1011", "DC-10", "MD-11", "BELUGA", "A306", "A310"],
-    "widebody_four_engine": ["A340", "A342", "A343", "A345", "A346", "747", "B741", "B742", "B743", "B744", "B748", "A380", "A388"]
-}
 
-def load_icons(icons_dir="assets/icons"):
-    if not os.path.exists(icons_dir): return
+def load_icons(icons_dir="assets/planes"):
+    if not os.path.exists(icons_dir):
+        print(f"[WARNING] Folder ikon tidak ditemukan: {icons_dir}")
+        return
     for filename in os.listdir(icons_dir):
         if filename.endswith(".svg"):
-            name = filename[:-4]
+            name = filename[:-4].lower()
             renderer = QSvgRenderer(os.path.join(icons_dir, filename))
-            if renderer.isValid(): _SVG_CACHE[name] = renderer
+            if renderer.isValid():
+                _SVG_CACHE[name] = renderer
+    print(f"[INFO] Berhasil memuat {len(_SVG_CACHE)} ikon pesawat dari FlightEye.")
+
+# KAMUS LENGKAP: Mencakup semua file yang sudah Anda unduh
+AIRCRAFT_MAPPING = {
+    # Boeing
+    "b737": "b737", "737": "b737", "b738": "b737", "b739": "b737", "b38m": "b737", "b39m": "b737",
+    "b747": "b747", "747": "b747", "b741": "b747", "b742": "b747", "b743": "b747", "b744": "b747", "b748": "b747",
+    "b757": "b757", "757": "b757",
+    "b767": "b767", "767": "b767",
+    "b777": "b777", "777": "b777", "b772": "b777", "b773": "b777", "b77w": "b777", "b778": "b777", "b779": "b777",
+    "b787": "b787", "787": "b787", "b788": "b787", "b789": "b787", "b78x": "b787",
+    "b707": "b707", "707": "b707",
+
+    # Airbus
+    "a320": "a320", "320": "a320", "a319": "a320", "a321": "a320", "a20n": "a320", "a21n": "a320",
+    "a330": "a330", "330": "a330", "a332": "a330", "a333": "a330", "a338": "a330", "a339": "a330",
+    "a340": "a340", "340": "a340", "a342": "a340", "a343": "a340", "a345": "a340", "a346": "a340",
+    "a350": "a350", "350": "a350", "a359": "a350", "a35k": "a350",
+    "a380": "a380", "380": "a380", "a388": "a380",
+    "a220": "a220", "220": "a220", "bcs3": "a220",
+    "an225": "an225", "225": "an225",
+    "cncd": "cncd", "concorde": "cncd",
+
+    # Embraer & Bombardier
+    "crj": "crj700", "crj7": "crj700", "crj9": "crj700",
+    "e190": "e190", "e195": "e190", "e175": "e190", "e170": "e190",
+
+    # Turboprops
+    "atr": "atr72", "at72": "atr72", "at76": "atr72", "atr72": "atr72",
+    "dh8d": "dh8d", "q400": "dh8d",
+    "dhc6": "dhc6",
+
+    # General Aviation
+    "c208": "c172", "c172": "c172", "c182": "c172",
+    "da42": "da42", "da40": "da42", "da62": "da42",
+
+    # Others
+    "md11": "md11", "dc10": "dc10", "lj45": "lj45",
+    "c17": "c17", "a400": "c17", "c5m": "c17",
+    "e3": "e3", "p8": "p8",
+
+    # Military
+    "f16": "f16", "f15": "f15", "f18": "f18h", "f22": "f22", "f35": "f35", "f4": "f4e",
+    "a10": "a10", "b1": "b1", "eurofighter": "eurofighter", "typhoon": "eurofighter",
+
+    # Helicopters
+    "h135": "chopper", "h145": "chopper", "uh60": "chopper", "ch47": "chopper",
+    "chopper": "chopper", "helicopter": "chopper"
+}
 
 def get_icon_for_aircraft(ac_type):
     if not ac_type: return None
-    ac_type_upper = ac_type.upper().replace(" ", "")
-    for icon_name, keywords in AIRCRAFT_CATEGORIES.items():
-        for kw in keywords:
-            if kw.replace(" ", "") in ac_type_upper: return icon_name
+
+    ac_lower = ac_type.lower().replace(" ", "").replace("-", "")
+
+    # 1. Cari persis (misal: "A340" -> "a340")
+    if ac_lower in _SVG_CACHE: return ac_lower
+
+    # 2. Cari via Mapping
+    if ac_lower in AIRCRAFT_MAPPING:
+        mapped_name = AIRCRAFT_MAPPING[ac_lower]
+        if mapped_name in _SVG_CACHE: return mapped_name
+
+    # 3. Cari parsial (misal: "Airbus A340" -> "340" -> "a340")
+    for key, mapped_name in AIRCRAFT_MAPPING.items():
+        if key in ac_lower and mapped_name in _SVG_CACHE:
+            return mapped_name
+
+    # 4. Fallback Helikopter
+    if "heli" in ac_lower or "chopper" in ac_lower:
+        if "chopper" in _SVG_CACHE: return "chopper"
+
     return None
 
 class AircraftItem(QGraphicsItem):
@@ -43,10 +99,10 @@ class AircraftItem(QGraphicsItem):
         self.aircraft_type = aircraft_type
         self.heading = 0
         self.size = 8
-        self.icon_size = 20
+        self.icon_size = 24
 
         self.is_hovered = False
-        self.always_show_label = False # <-- TAMBAHAN UNTUK SETTINGS
+        self.always_show_label = False
         self.label_text = callsign.split("-")[0] if "-" in callsign else callsign
 
         self.setFlag(QGraphicsItem.ItemIsSelectable)
@@ -114,7 +170,7 @@ class AircraftItem(QGraphicsItem):
             metrics = painter.fontMetrics()
             text_width = metrics.horizontalAdvance(self.label_text) + 8
             text_height = metrics.height() + 2
-            label_rect = QRectF(10, -text_height / 2, text_width, text_height)
+            label_rect = QRectF(12, -text_height / 2, text_width, text_height)
             painter.setPen(QPen(QColor(180, 180, 180), 1))
             painter.setBrush(QBrush(QColor(255, 255, 255, 230)))
             painter.drawRoundedRect(label_rect, 3, 3)
@@ -122,14 +178,17 @@ class AircraftItem(QGraphicsItem):
             painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
             painter.restore()
 
-# ... (TrailItem biarkan sama seperti sebelumnya) ...
 class TrailItem(QGraphicsItem):
     def __init__(self):
         super().__init__()
         self.setZValue(-0.5)
         self.trail_points = []
+
     def set_points(self, points):
-        if len(points) < 3: self.trail_points = points; self.update(); return
+        if len(points) < 3:
+            self.trail_points = points
+            self.update()
+            return
         pts = points
         for _ in range(2):
             new_pts = [pts[0]]
@@ -141,24 +200,32 @@ class TrailItem(QGraphicsItem):
             pts = new_pts
         self.trail_points = pts
         self.update()
+
     def boundingRect(self):
         if not self.trail_points: return QRectF()
         return QRectF(min(p["x"] for p in self.trail_points)/100-20, min(p["y"] for p in self.trail_points)/100-20, (max(p["x"] for p in self.trail_points)-min(p["x"] for p in self.trail_points))/100+40, (max(p["y"] for p in self.trail_points)-min(p["y"] for p in self.trail_points))/100+40)
+
     def paint(self, painter, option, widget=None):
         if len(self.trail_points) < 2: return
         painter.setRenderHint(QPainter.Antialiasing)
         for i in range(1, len(self.trail_points)):
             p1, p2 = self.trail_points[i-1], self.trail_points[i]
             color = self._get_smooth_color((p1["alt"] + p2["alt"]) / 2.0)
-            pen = QPen(color); pen.setWidthF(3.0); pen.setCosmetic(True); pen.setCapStyle(Qt.RoundCap); pen.setJoinStyle(Qt.RoundJoin)
+            pen = QPen(color)
+            pen.setWidthF(3.0)
+            pen.setCosmetic(True)
+            pen.setCapStyle(Qt.RoundCap)
+            pen.setJoinStyle(Qt.RoundJoin)
             painter.setPen(pen)
             painter.drawLine(QPointF(p1["x"]/100, p1["y"]/100), QPointF(p2["x"]/100, p2["y"]/100))
+
     def _get_smooth_color(self, alt):
         keys = [(0,255,255,255), (1000,244,180,0), (2500,76,175,80), (4000,0,188,212), (5500,33,150,243), (7000,156,39,176), (9000,244,67,54)]
         if alt <= 0: return QColor(255,255,255)
         if alt >= 9000: return QColor(244,67,54)
         for i in range(len(keys) - 1):
-            a1, r1, g1, b1 = keys[i]; a2, r2, g2, b2 = keys[i+1]
+            a1, r1, g1, b1 = keys[i]
+            a2, r2, g2, b2 = keys[i+1]
             if a1 <= alt <= a2:
                 rat = (alt - a1) / (a2 - a1)
                 return QColor(int(r1+(r2-r1)*rat), int(g1+(g2-g1)*rat), int(b1+(b2-b1)*rat))
