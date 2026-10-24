@@ -11,33 +11,27 @@ from backend.api_client import DataClient
 def main():
     app = QApplication(sys.argv)
 
-    # 1. Buat event loop qasync
     loop = QEventLoop(app)
     asyncio.set_event_loop(loop)
 
-    # 2. Inisialisasi UI
     window = MainWindow()
     window.show()
 
-    # 3. Inisialisasi Backend dan Hubungkan Sinyal
     client = DataClient()
-
-    # Tampilkan log status koneksi ke terminal
     client.connection_status.connect(lambda msg: print(msg))
-
-    # Hubungkan data ke UI
     client.aircraft_data_received.connect(window.update_aircraft)
-
-    # HUBUNGKAN SINYAL BARU UNTUK FITUR WEATHER
     client.atis_data_received.connect(window.update_atis)
 
-    # (Opsional) Jika Anda ingin fitur ATC di masa depan:
-    # client.controllers_data_received.connect(window.update_controllers)
+    ws_task = loop.create_task(client.connect())
 
-    # 4. Jalankan koneksi WebSocket di background
-    loop.create_task(client.connect())
+    def on_app_close():
+        print("\n[INFO] Closing app...")
+        client.stop()
+        ws_task.cancel()
+        loop.stop()
 
-    # 5. Jalankan aplikasi
+    app.aboutToQuit.connect(on_app_close)
+
     with loop:
         sys.exit(loop.run_forever())
 
