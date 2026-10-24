@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, 
 
 from frontend.styles import MAIN_STYLESHEET
 from frontend.ui_components import (TopBar, Sidebar, BottomToolbar, MapControls,
-                                    FlightInfoPanel, FilterPanel, SettingsPanel, WeatherPanel, AirportInfoPanel)
+                                    FlightInfoPanel, FilterPanel, SettingsPanel, WeatherPanel, AirportInfoPanel, EmergencyAlertPanel)
 from frontend.map_items import AircraftItem, load_icons, TrailItem, AirportItem
 from frontend.map_view import MapView
 from frontend.airlines import get_airline_icao
@@ -23,6 +23,7 @@ from backend.settings_manager import SettingsManager
 from backend.updater import AutoUpdater
 from backend.flight_plan_store import FlightPlanStore
 
+# ================= KOORDINAT BANDARA (DIKUNCI) =================
 AIRPORT_COORDS = {
     "IRFD": {"x": -2906.170327039993, "y": 21381.94313216},
     "IPPH": {"x": 18155.776, "y": -19415.616},
@@ -89,6 +90,10 @@ class MainWindow(QMainWindow):
         self.map_controls = MapControls(self.view, self.view)
         self.bottom_toolbar = BottomToolbar(self.view)
 
+        # PANEL EMERGENCY BARU
+        self.alert_panel = EmergencyAlertPanel(self.view)
+        self.alert_panel.alert_clicked.connect(self.focus_on_aircraft)
+
         self.filter_panel = FilterPanel(self.view)
         self.settings_panel = SettingsPanel(self.view)
         self.weather_panel = WeatherPanel(self.view)
@@ -130,6 +135,7 @@ class MainWindow(QMainWindow):
         else: self.sidebar.hide()
         self.info_panel.hide()
         self.airport_panel.hide()
+        self.alert_panel.hide()
 
         QTimer.singleShot(2000, self.run_auto_updater)
 
@@ -267,6 +273,9 @@ class MainWindow(QMainWindow):
         self.info_panel.setGeometry(-360, 100, 340, ph)
         self.airport_panel.setGeometry(w, 100, 340, ph)
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
+
+        # POSISI PANEL EMERGENCY (Di kanan bawah, di atas toolbar)
+        self.alert_panel.setGeometry(w - 320, h - 260, 300, 160)
 
         tb_w = 400
         tb_x = (w - tb_w) // 2
@@ -422,12 +431,20 @@ class MainWindow(QMainWindow):
         self.current_data = filtered_data
         active_callsigns = set(filtered_data.keys())
 
+        # KUNCI: Daftar untuk Emergency Alert
+        emergencies = []
+
         for callsign, info in filtered_data.items():
             if "x" not in info or "y" not in info: continue
             x, y = info["x"], info["y"]
             heading = info.get("heading", 0)
             alt = info.get("altitude", 0)
             ac_type = info.get("aircraftType", "")
+
+            # Ambil status emergency
+            is_emergency = info.get("isEmergency", False)
+            if is_emergency:
+                emergencies.append(callsign)
 
             icao = get_airline_icao(callsign)
             flight_num = callsign.split("-")[-1] if "-" in callsign else ""
@@ -439,8 +456,12 @@ class MainWindow(QMainWindow):
                 self.scene.addItem(plane)
                 self.aircraft_items[callsign] = plane
 
-            self.aircraft_items[callsign].update_data(x, y, heading, ac_type, label_text)
+            # Kirim status emergency ke item pesawat
+            self.aircraft_items[callsign].update_data(x, y, heading, ac_type, label_text, is_emergency)
             self.trail_manager.add_point(callsign, x, y, alt)
+
+        # KUNCI: Perbarui panel alert di pojok layar
+        self.alert_panel.update_alerts(emergencies)
 
         if self.follow_callsign and self.follow_callsign in self.aircraft_items:
             item = self.aircraft_items[self.follow_callsign]

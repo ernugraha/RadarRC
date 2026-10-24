@@ -2,7 +2,7 @@
 
 import os
 from PySide6.QtWidgets import QGraphicsItem
-from PySide6.QtCore import Qt, QRectF, QPointF
+from PySide6.QtCore import Qt, QRectF, QPointF, QTimer
 from PySide6.QtGui import QPainter, QPolygonF, QBrush, QColor, QPen, QPainterPath, QFont
 from PySide6.QtSvg import QSvgRenderer
 
@@ -65,6 +65,16 @@ class AircraftItem(QGraphicsItem):
         self.setAcceptHoverEvents(True)
         self.setTransformOriginPoint(0, 0)
 
+        # KUNCI: Timer untuk kedipan emergency
+        self.is_emergency = False
+        self.flash_state = False
+        self.flash_timer = QTimer()
+        self.flash_timer.timeout.connect(self.toggle_flash)
+
+    def toggle_flash(self):
+        self.flash_state = not self.flash_state
+        self.update()
+
     def hoverEnterEvent(self, event):
         self.is_hovered = True
         self.update()
@@ -75,13 +85,23 @@ class AircraftItem(QGraphicsItem):
         self.update()
         super().hoverLeaveEvent(event)
 
-    def update_data(self, x, y, heading, aircraft_type="", label_text=""):
+    def update_data(self, x, y, heading, aircraft_type="", label_text="", is_emergency=False):
         self.setPos(x / 100.0, y / 100.0)
         if aircraft_type and self.aircraft_type != aircraft_type: self.aircraft_type = aircraft_type
         if label_text: self.label_text = label_text
         if self.heading != heading:
             self.heading = heading
             self.setRotation(self.heading)
+
+        # KUNCI: Atur timer kedipan
+        if self.is_emergency != is_emergency:
+            self.is_emergency = is_emergency
+            if self.is_emergency:
+                self.flash_timer.start(400) # Kedip setiap 0.4 detik
+            else:
+                self.flash_timer.stop()
+                self.flash_state = False
+                self.update()
 
     def boundingRect(self): return QRectF(-150, -150, 300, 300)
 
@@ -94,10 +114,22 @@ class AircraftItem(QGraphicsItem):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
+        # Warna normal vs emergency
+        if self.is_emergency:
+            color = QColor("#ff0000") if self.flash_state else QColor("#f4b400") # Merah / Kuning
+        else:
+            color = QColor("#f4b400")
+
         if self.isSelected():
             painter.setPen(Qt.NoPen)
             painter.setBrush(QBrush(QColor(255, 255, 255, 60)))
             painter.drawEllipse(-12, -12, 24, 24)
+
+        # Jika emergency, gambar lingkaran berkedip di belakang ikon
+        if self.is_emergency:
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(color))
+            painter.drawEllipse(-self.icon_size, -self.icon_size, self.icon_size*2, self.icon_size*2)
 
         icon_name = get_icon_for_aircraft(self.aircraft_type)
         renderer = _SVG_CACHE.get(icon_name) if icon_name else None
@@ -106,7 +138,7 @@ class AircraftItem(QGraphicsItem):
             target_rect = QRectF(-self.icon_size/2, -self.icon_size/2, self.icon_size, self.icon_size)
             renderer.render(painter, target_rect)
         else:
-            painter.setBrush(QBrush(QColor("#f4b400")))
+            painter.setBrush(QBrush(color))
             painter.setPen(QPen(QColor("#000000"), 1))
             s = self.size
             painter.drawPolygon(QPolygonF([
@@ -130,6 +162,7 @@ class AircraftItem(QGraphicsItem):
             painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
             painter.restore()
 
+# ... (Sisa class AirportItem dan TrailItem biarkan sama seperti sebelumnya) ...
 class AirportItem(QGraphicsItem):
     def __init__(self, icao, name):
         super().__init__()
@@ -187,13 +220,10 @@ class TrailItem(QGraphicsItem):
         if len(self.trail_points) < 2: return
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # Ketebalan dinaikkan sedikit agar gradasi terlihat jelas
         line_width = 4.0
 
         for i in range(1, len(self.trail_points)):
             p1, p2 = self.trail_points[i-1], self.trail_points[i]
-
-            # Warna Gradasi
             color = self._get_smooth_color((p1["alt"] + p2["alt"]) / 2.0)
 
             pen = QPen(color)

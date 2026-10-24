@@ -706,9 +706,64 @@ class WeatherPanel(QFrame):
             lbl.setStyleSheet("color: #ccc; font-family: monospace; font-size: 11px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 5px;")
             self.content_layout.addWidget(lbl)
 
-# ==========================================
-# TOOLBAR BAWAH & MAP CONTROLS
-# ==========================================
+class EmergencyAlertPanel(QFrame):
+    alert_clicked = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("EmergencyPanel")
+        self.setVisible(False)
+        self.setFixedWidth(300)
+
+        # Style khusus merah
+        self.setStyleSheet("""
+            QFrame#EmergencyPanel {
+                background-color: rgba(40, 0, 0, 0.95);
+                border: 2px solid #ff0000;
+                border-radius: 10px;
+            }
+            QLabel { color: white; }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        title = QLabel("EMERGENCY ALERTS")
+        title.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 14px;")
+        layout.addWidget(title)
+
+        self.list_layout = QVBoxLayout()
+        self.list_layout.setSpacing(5)
+        layout.addLayout(self.list_layout)
+
+    def update_alerts(self, emergencies):
+        # Hapus tombol lama
+        for i in reversed(range(self.list_layout.count())):
+            widget = self.list_layout.itemAt(i).widget()
+            if widget: widget.deleteLater()
+
+        if not emergencies:
+            self.setVisible(False)
+            return
+
+        self.setVisible(True)
+        for cs in emergencies:
+            btn = QPushButton(f"! {cs}")
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #ff0000;
+                    color: white;
+                    text-align: left;
+                    font-weight: bold;
+                    padding: 5px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover { background-color: #cc0000; }
+            """)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked, c=cs: self.alert_clicked.emit(c))
+            self.list_layout.addWidget(btn)
+
 class BottomToolbar(QFrame):
     tool_clicked = Signal(str)
     def __init__(self, parent=None):
