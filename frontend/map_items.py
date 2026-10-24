@@ -94,21 +94,37 @@ class TrailItem(QGraphicsItem):
         self.trail_points = []
 
     def set_points(self, points):
-        # Smoothing (Moving Average)
         if len(points) < 3:
             self.trail_points = points
             self.update()
             return
 
-        smoothed = [points[0]]
-        for i in range(1, len(points) - 1):
-            x = (points[i-1]["x"] + points[i]["x"] + points[i+1]["x"]) / 3.0
-            y = (points[i-1]["y"] + points[i]["y"] + points[i+1]["y"]) / 3.0
-            alt = (points[i-1]["alt"] + points[i]["alt"] + points[i+1]["alt"]) / 3.0
-            smoothed.append({"x": x, "y": y, "alt": alt})
-        smoothed.append(points[-1])
+        # ALGORITMA CHAIKIN (Corner Cutting)
+        # Menghaluskan seluruh titik, termasuk data paling lama (ekor)
+        pts = points
+        for _ in range(2): # Lakukan 2 iterasi agar mulus sempurna
+            new_pts = []
+            new_pts.append(pts[0]) # Pertahankan titik awal
+            for i in range(len(pts) - 1):
+                p0 = pts[i]
+                p1 = pts[i+1]
 
-        self.trail_points = smoothed
+                # Rumus Chaikin: 75% titik awal + 25% titik akhir
+                q_x = p0["x"] * 0.75 + p1["x"] * 0.25
+                q_y = p0["y"] * 0.75 + p1["y"] * 0.25
+                q_alt = p0["alt"] * 0.75 + p1["alt"] * 0.25
+
+                # Rumus Chaikin: 25% titik awal + 75% titik akhir
+                r_x = p0["x"] * 0.25 + p1["x"] * 0.75
+                r_y = p0["y"] * 0.25 + p1["y"] * 0.75
+                r_alt = p0["alt"] * 0.25 + p1["alt"] * 0.75
+
+                new_pts.append({"x": q_x, "y": q_y, "alt": q_alt})
+                new_pts.append({"x": r_x, "y": r_y, "alt": r_alt})
+            new_pts.append(pts[-1]) # Pertahankan titik akhir
+            pts = new_pts
+
+        self.trail_points = pts
         self.update()
 
     def boundingRect(self):
@@ -117,27 +133,27 @@ class TrailItem(QGraphicsItem):
         max_x = max(p["x"] for p in self.trail_points) / 100.0
         min_y = min(p["y"] for p in self.trail_points) / 100.0
         max_y = max(p["y"] for p in self.trail_points) / 100.0
-        return QRectF(min_x - 10, min_y - 10, (max_x - min_x) + 20, (max_y - min_y) + 20)
+        return QRectF(min_x - 20, min_y - 20, (max_x - min_x) + 40, (max_y - min_y) + 40)
 
     def paint(self, painter, option, widget=None):
         if len(self.trail_points) < 2: return
         painter.setRenderHint(QPainter.Antialiasing)
 
-        line_width = 2.0
-        radius = line_width / 2.0
+        line_width = 3.0
 
+        # Karena titiknya sudah sangat rapat dan halus (dari Chaikin),
+        # kita hanya perlu menggambar garis lurus antar titik.
         for i in range(1, len(self.trail_points)):
             p1 = self.trail_points[i-1]
             p2 = self.trail_points[i]
 
             avg_alt = (p1["alt"] + p2["alt"]) / 2.0
             color = self._get_smooth_color(avg_alt)
-            color.setAlpha(255) # Anti pudar
 
             pen = QPen(color)
             pen.setWidthF(line_width)
             pen.setCosmetic(True)
-            pen.setCapStyle(Qt.FlatCap) # Cegah tebal di ujung
+            pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)
             painter.setPen(pen)
 
@@ -145,19 +161,6 @@ class TrailItem(QGraphicsItem):
             pt2 = QPointF(p2["x"] / 100.0, p2["y"] / 100.0)
 
             painter.drawLine(pt1, pt2)
-
-            # Titik manis di sambungan (Bikin smooth)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(color))
-            painter.drawEllipse(pt1, radius, radius)
-
-        if self.trail_points:
-            p_start = self.trail_points[0]
-            start_color = self._get_smooth_color(p_start["alt"])
-            start_color.setAlpha(255)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QBrush(start_color))
-            painter.drawEllipse(QPointF(p_start["x"] / 100.0, p_start["y"] / 100.0), radius, radius)
 
     def _get_smooth_color(self, alt):
         keys = [
