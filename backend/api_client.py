@@ -21,31 +21,40 @@ class DataClient(QObject):
         self._last_cleanup_time = 0
 
     def process_aircraft(self, payload):
-        # ... (Sama seperti sebelumnya) ...
         if not isinstance(payload, dict): return {}
         result = {}
         active_callsigns = set()
+        active_usernames = set()
 
         for callsign, ac in payload.items():
             if not isinstance(ac, dict): continue
+
             active_callsigns.add(callsign)
+            player_name = ac.get("playerName", "")
+            if player_name:
+                active_usernames.add(player_name)
+
             pos = ac.get("position", {})
             entry = {
                 "x": float(pos.get("x", 0)), "y": float(pos.get("y", 0)),
                 "heading": float(ac.get("heading", 0)), "altitude": float(ac.get("altitude", 0)),
-                "playerName": ac.get("playerName", ""), "aircraftType": ac.get("aircraftType", ""),
+                "playerName": player_name, "aircraftType": ac.get("aircraftType", ""),
                 "speed": float(ac.get("speed", 0)), "isOnGround": bool(ac.get("isOnGround", False)),
             }
-            plan = self.plan_store.get_plan(callsign)
-            if plan:
-                entry["plan_departing"] = plan.get("departing", "")
-                entry["plan_arriving"] = plan.get("arriving", "")
-                entry["plan_route"] = plan.get("route", "")
+
+            # COCOKKAN FLIGHT PLAN BERDASARKAN USERNAME
+            if player_name:
+                plan = self.plan_store.get_plan(player_name)
+                if plan:
+                    entry["plan_departing"] = plan.get("departing", "")
+                    entry["plan_arriving"] = plan.get("arriving", "")
+                    entry["plan_route"] = plan.get("route", "")
+
             result[callsign] = entry
 
         now = asyncio.get_event_loop().time()
         if now - self._last_cleanup_time > 30:
-            self.plan_store.cleanup_stale_data(active_callsigns)
+            self.plan_store.cleanup_stale_data(active_usernames, active_callsigns)
             self._last_cleanup_time = now
 
         return result
@@ -72,14 +81,14 @@ class DataClient(QObject):
 
                             elif event_type == "FLIGHT_PLAN":
                                 plan_data = data.get("d", {})
-                                callsign = plan_data.get("callsign")
-                                if callsign:
-                                    self.plan_store.save_plan(callsign, plan_data)
-                                    # LOGGING BARU
+                                roblox_name = plan_data.get("robloxName")
+                                if roblox_name:
+                                    self.plan_store.save_plan(roblox_name, plan_data)
                                     dep = plan_data.get("departing", "N/A")
                                     arr = plan_data.get("arriving", "N/A")
-                                    print(f"[FLIGHT PLAN RECEIVED] {callsign} -> {dep} to {arr}")
+                                    print(f"[FLIGHT PLAN RECEIVED] {roblox_name} -> {dep} to {arr}")
 
+                            # ... (Controllers dan ATIS biarkan sama) ...
                             elif event_type == "CONTROLLERS":
                                 controllers = data.get("d", [])
                                 parsed = {}
