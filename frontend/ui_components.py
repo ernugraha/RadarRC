@@ -1,12 +1,50 @@
 # frontend/ui_components.py
 
+import os
+import re
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout, QApplication)
-from PySide6.QtCore import Qt, Signal
-from frontend.airlines import get_airline_name
+from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QPixmap
+from frontend.airlines import get_airline_name, get_airline_keys
+
+# ================================================================
+# FUNGSI PENCARI FOTO PESAWAT
+# ================================================================
+def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
+    if not os.path.exists(photo_dir):
+        return None
+
+    # Bersihkan nama tipe pesawat (contoh: "Airbus A320" -> "a320")
+    ac_clean = aircraft_type.lower().replace(" ", "").replace("-", "")
+    nums = ''.join(re.findall(r'\d+', ac_clean))
+    model = nums if nums else ac_clean
+
+    # Dapatkan kunci maskapai dari airlines.py
+    airline_keys = get_airline_keys(callsign)
+
+    candidates = []
+    # 1. Kombinasi Tipe + Maskapai (a320_baw.png / baw_a320.png)
+    for akey in airline_keys:
+        candidates.append(f"{model}_{akey}.png")
+        candidates.append(f"{akey}_{model}.png")
+    # 2. Tipe Generik (a320.png)
+    if model:
+        candidates.append(f"{model}.png")
+    # 3. Maskapai Generik (baw.png)
+    for akey in airline_keys:
+        candidates.append(f"{akey}.png")
+    # 4. Callsign Spesifik (shamrock-123.png)
+    candidates.append(f"{callsign.lower()}.png")
+
+    for name in candidates:
+        path = os.path.join(photo_dir, name)
+        if os.path.isfile(path):
+            return path
+    return None
+
 
 class TopBar(QWidget):
-    # ... (Sama seperti sebelumnya)
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
@@ -26,7 +64,6 @@ class TopBar(QWidget):
         layout.addWidget(view_btn)
 
 class FlightPanel(QFrame):
-    # ... (Sama seperti sebelumnya)
     clicked = Signal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,7 +104,6 @@ class FlightPanel(QFrame):
         super().mousePressEvent(event)
 
 class Sidebar(QFrame):
-    # ... (Sama seperti sebelumnya)
     flight_clicked = Signal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -182,7 +218,7 @@ class FlightInfoPanel(QFrame):
         route_layout.addWidget(self.lbl_arr, 1)
         main_layout.addWidget(route_frame)
 
-        # ================= TELEMETRY GRID (BORDERS) =================
+        # ================= TELEMETRY GRID =================
         telemetry_frame = QFrame()
         tele_layout = QGridLayout(telemetry_frame)
         tele_layout.setContentsMargins(15, 5, 15, 15)
@@ -195,7 +231,10 @@ class FlightInfoPanel(QFrame):
 
         main_layout.addWidget(telemetry_frame)
 
-        # ================= PILOT INFO (COPYABLE) =================
+        # Spacer agar pilot info mentok ke bawah
+        main_layout.addStretch()
+
+        # ================= PILOT INFO =================
         pilot_frame = QFrame()
         pilot_frame.setStyleSheet("background-color: #111; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
         pilot_layout = QVBoxLayout(pilot_frame)
@@ -214,34 +253,26 @@ class FlightInfoPanel(QFrame):
 
         main_layout.addWidget(pilot_frame)
 
-        # Simpan username untuk fungsi copy
         self.current_pilot_name = "Unknown"
 
     def create_telemetry_box(self, layout, row, col, title):
-        """Membuat kotak dengan border untuk data telemetri."""
         box = QFrame()
         box.setObjectName("TelemetryBox")
         box_layout = QVBoxLayout(box)
         box_layout.setContentsMargins(10, 8, 10, 8)
         box_layout.setSpacing(2)
-
         lbl_title = QLabel(title)
         lbl_title.setObjectName("DataLabel")
         lbl_val = QLabel("0")
         lbl_val.setObjectName("DataValue")
-
         box_layout.addWidget(lbl_title)
         box_layout.addWidget(lbl_val)
-
         layout.addWidget(box, row, col)
         return lbl_val
 
     def copy_username(self):
-        """Menyalin username ke clipboard."""
         QApplication.clipboard().setText(self.current_pilot_name)
-        # Beri feedback sementara pada tombol
         self.btn_pilot.setText("Copied!")
-        from PySide6.QtCore import QTimer
         QTimer.singleShot(1500, lambda: self.btn_pilot.setText(self.current_pilot_name))
 
     def set_flight_data(self, callsign, info):
@@ -256,21 +287,35 @@ class FlightInfoPanel(QFrame):
         self.lbl_dep.setText(dep if dep else "???")
         self.lbl_arr.setText(arr if arr else "???")
 
-        # Update Telemetri (Kotak)
         self.val_alt.setText(f"{int(info.get('altitude', 0)):,} ft")
         self.val_spd.setText(f"{int(info.get('speed', 0))} kts")
         self.val_hdg.setText(f"{int(info.get('heading', 0))}°")
-        self.val_vs.setText("0 ft/m") # Data V/Speed dari API belum tersedia
+        self.val_vs.setText("0 ft/m")
 
-        # Update Username
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
-        # Reset placeholder foto (jika ada logika load foto nanti, taruh di sini)
-        self.photo_box.setText("?")
+        # ================= LOGIKA LOAD FOTO =================
+        photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
+
+        if photo_path:
+            pixmap = QPixmap(photo_path)
+            # Skala gambar agar pas di kotak (mempertahankan aspek rasio)
+            scaled_pixmap = pixmap.scaled(
+                self.photo_box.width() - 4,
+                self.photo_box.height() - 4,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.photo_box.setPixmap(scaled_pixmap)
+            self.photo_box.setText("") # Hapus tanda tanya
+            self.photo_box.setStyleSheet("background-color: #000; border: 1px solid #444; border-radius: 6px;")
+        else:
+            self.photo_box.clear()
+            self.photo_box.setText("?")
+            self.photo_box.setStyleSheet("") # Kembalikan ke style default QSS
 
 class BottomToolbar(QFrame):
-    # ... (Sama seperti sebelumnya)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("BottomToolbar")
@@ -285,7 +330,6 @@ class BottomToolbar(QFrame):
             layout.addWidget(btn)
 
 class MapControls(QWidget):
-    # ... (Sama seperti sebelumnya)
     def __init__(self, map_view, parent=None):
         super().__init__(parent)
         self.map_view = map_view
