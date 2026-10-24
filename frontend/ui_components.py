@@ -58,8 +58,6 @@ class TopBar(QWidget):
         self.search_bar.setFixedWidth(450)
         self.search_bar.returnPressed.connect(self.on_search_enter)
 
-        view_btn = QPushButton("VIEW Map v")
-        view_btn.setObjectName("ViewMapBtn")
         layout.addWidget(logo)
         layout.addStretch()
         layout.addWidget(self.search_bar)
