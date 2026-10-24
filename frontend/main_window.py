@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
-        panel_height = min(600, h - 200)
+        panel_height = 480
         self.sidebar.setGeometry(20, 100, 340, panel_height)
         self.info_panel.setGeometry(-360, 100, 340, panel_height)
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)

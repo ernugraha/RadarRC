@@ -16,7 +16,6 @@ QFrame#Sidebar {
     border: 1px solid #333;
 }
 
-/* Desain Item Pesawat di Sidebar */
 QFrame#FlightPanel {
     background-color: #2b2b2b;
     border-radius: 8px;
@@ -27,7 +26,7 @@ QFrame#FlightPanel:hover {
     border: 1px solid #f4b400;
 }
 
-/* --- SCROLLBAR CUSTOM --- */
+/* --- SCROLLBAR --- */
 QScrollArea {
     border: none;
     background: transparent;
@@ -53,7 +52,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: transparent;
 }
 
-/* --- TOP BAR --- */
+/* --- TOP BAR & BOTTOM TOOLBAR --- */
 QLineEdit#SearchBar {
     background-color: rgba(255, 255, 255, 0.95);
     color: #121212;
@@ -73,8 +72,6 @@ QPushButton#ViewMapBtn {
 QPushButton#ViewMapBtn:hover {
     background-color: rgba(50, 50, 50, 0.85);
 }
-
-/* --- BOTTOM TOOLBAR --- */
 QFrame#BottomToolbar {
     background-color: rgba(25, 25, 25, 0.95);
     border-radius: 30px;
@@ -106,7 +103,7 @@ QPushButton#ZoomBtn:hover {
     background-color: rgba(70, 70, 70, 0.9);
 }
 
-/* --- TEKS & LABEL --- */
+/* --- TEXT & LABELS --- */
 QLabel#AppLogo {
     font-size: 22px;
     font-weight: bold;
@@ -154,6 +151,23 @@ QLabel#RouteCode {
     font-weight: bold;
     color: white;
 }
+
+/* --- PHOTO PLACEHOLDER --- */
+QLabel#PhotoBox {
+    background-color: #222;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #555;
+    font-size: 48px;
+    font-weight: bold;
+}
+
+/* --- TELEMETRY BOXES (BORDERED) --- */
+QFrame#TelemetryBox {
+    background-color: #222;
+    border: 1px solid #333;
+    border-radius: 6px;
+}
 QLabel#DataLabel {
     color: #777;
     font-size: 10px;
@@ -163,5 +177,19 @@ QLabel#DataValue {
     color: #f4b400;
     font-size: 16px;
     font-weight: bold;
+}
+
+/* --- COPY BUTTON --- */
+QPushButton#CopyBtn {
+    background-color: transparent;
+    border: none;
+    color: #4ade80; /* Hijau */
+    font-size: 14px;
+    font-weight: bold;
+    text-align: left;
+}
+QPushButton#CopyBtn:hover {
+    color: #86efac;
+    text-decoration: underline;
 }
 """
