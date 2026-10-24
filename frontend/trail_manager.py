@@ -5,7 +5,7 @@ import math
 from backend.flight_plan_store import FlightPlanStore
 
 class TrailManager:
-    def __init__(self, max_points=10000):
+    def __init__(self, max_points=1500): # Dibatasi agar tidak berat
         self.max_points = max_points
         self.trails = {}
         self.db = FlightPlanStore()
@@ -19,10 +19,9 @@ class TrailManager:
 
         if len(trail) > 0:
             last = trail[-1]
-            # FILTER JARAK: Jika pesawat bergerak kurang dari 2 unit, abaikan.
-            # Ini mencegah penumpukan titik saat pesawat hover/berputar di landasan.
+            # Filter jarak: jangan rekam jika pesawat tidak bergerak (mengurangi titik sampah)
             dist = math.hypot(last["x"] - x, last["y"] - y)
-            if dist < 2.0:
+            if dist < 15.0: # Jarak minimal 15 studs
                 return
 
         trail.append({"x": x, "y": y, "alt": alt})
@@ -37,7 +36,7 @@ class TrailManager:
 
     def sync_to_db(self):
         now = time.time()
-        if now - self.last_save_time > 2.0:
+        if now - self.last_save_time > 5.0: # Simpan tiap 5 detik agar tidak lag
             for cs, trail in self.trails.items():
                 self.db.save_trail(cs, trail)
             self.last_save_time = now

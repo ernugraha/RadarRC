@@ -162,7 +162,6 @@ class AircraftItem(QGraphicsItem):
             painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
             painter.restore()
 
-# ... (Sisa class AirportItem dan TrailItem biarkan sama seperti sebelumnya) ...
 class AirportItem(QGraphicsItem):
     def __init__(self, icao, name):
         super().__init__()
@@ -194,46 +193,65 @@ class TrailItem(QGraphicsItem):
         super().__init__()
         self.setZValue(-0.5)
         self.trail_points = []
+        self._cached_paths = [] # Menyimpan path yang sudah dihitung agar tidak dihitung ulang tiap frame
 
     def set_points(self, points):
         if len(points) < 3:
             self.trail_points = points
+            self._build_cache()
             self.update()
             return
+
+        # CUKUP 1 KALI SMOOTHING (Tidak perlu 2x agar tidak 40.000 titik)
         pts = points
-        for _ in range(2):
-            new_pts = [pts[0]]
-            for i in range(len(pts) - 1):
-                p0, p1 = pts[i], pts[i+1]
-                new_pts.append({"x": p0["x"]*0.75 + p1["x"]*0.25, "y": p0["y"]*0.75 + p1["y"]*0.25, "alt": p0["alt"]*0.75 + p1["alt"]*0.25})
-                new_pts.append({"x": p0["x"]*0.25 + p1["x"]*0.75, "y": p0["y"]*0.25 + p1["y"]*0.75, "alt": p0["alt"]*0.25 + p1["alt"]*0.75})
-            new_pts.append(pts[-1])
-            pts = new_pts
-        self.trail_points = pts
+        new_pts = [pts[0]]
+        for i in range(len(pts) - 1):
+            p0, p1 = pts[i], pts[i+1]
+            new_pts.append({"x": p0["x"]*0.75 + p1["x"]*0.25, "y": p0["y"]*0.75 + p1["y"]*0.25, "alt": p0["alt"]*0.75 + p1["alt"]*0.25})
+            new_pts.append({"x": p0["x"]*0.25 + p1["x"]*0.75, "y": p0["y"]*0.25 + p1["y"]*0.75, "alt": p0["alt"]*0.25 + p1["alt"]*0.75})
+        new_pts.append(pts[-1])
+
+        self.trail_points = new_pts
+        self._build_cache()
         self.update()
+
+    def _build_cache(self):
+        """Membangun cache garis & warna agar tidak dihitung ulang setiap frame."""
+        self._cached_paths = []
+        if len(self.trail_points) < 2: return
+
+        for i in range(1, len(self.trail_points)):
+            p1, p2 = self.trail_points[i-1], self.trail_points[i]
+            color = self._get_smooth_color((p1["alt"] + p2["alt"]) / 2.0)
+
+            path = QPainterPath()
+            path.moveTo(p1["x"]/100, p1["y"]/100)
+            path.lineTo(p2["x"]/100, p2["y"]/100)
+
+            self._cached_paths.append((path, color))
 
     def boundingRect(self):
         if not self.trail_points: return QRectF()
         return QRectF(min(p["x"] for p in self.trail_points)/100-20, min(p["y"] for p in self.trail_points)/100-20, (max(p["x"] for p in self.trail_points)-min(p["x"] for p in self.trail_points))/100+40, (max(p["y"] for p in self.trail_points)-min(p["y"] for p in self.trail_points))/100+40)
 
     def paint(self, painter, option, widget=None):
-        if len(self.trail_points) < 2: return
+        if not self._cached_paths: return
         painter.setRenderHint(QPainter.Antialiasing)
 
         line_width = 4.0
 
-        for i in range(1, len(self.trail_points)):
-            p1, p2 = self.trail_points[i-1], self.trail_points[i]
-            color = self._get_smooth_color((p1["alt"] + p2["alt"]) / 2.0)
+        # KUNCI: Buat 1 QPen dasar, lalu ubah warnanya saja.
+        pen = QPen()
+        pen.setWidthF(line_width)
+        pen.setCosmetic(True)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
 
-            pen = QPen(color)
-            pen.setWidthF(line_width)
-            pen.setCosmetic(True)
-            pen.setCapStyle(Qt.RoundCap)
-            pen.setJoinStyle(Qt.RoundJoin)
-            painter.setPen(pen)
-
-            painter.drawLine(QPointF(p1["x"]/100, p1["y"]/100), QPointF(p2["x"]/100, p2["y"]/100))
+        for path, color in self._cached_paths:
+            pen.setColor(color)
+            painter.setPen(pen) # Cukup setColor, tidak buat QPen baru
+            painter.drawPath(path)
 
     def _get_smooth_color(self, alt):
         keys = [(0,255,255,255), (1000,244,180,0), (2500,76,175,80), (4000,0,188,212), (5500,33,150,243), (7000,156,39,176), (9000,244,67,54)]
