@@ -245,6 +245,7 @@ class FlightInfoPanel(QFrame):
         self.val_vs  = self.create_telemetry_box(tele_layout, 1, 1, "V/SPEED")
         main_layout.addWidget(telemetry_frame)
 
+        main_layout.addStretch()
         pilot_frame = QFrame()
         pilot_frame.setStyleSheet("background-color: #111; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
         pilot_layout = QVBoxLayout(pilot_frame)

@@ -77,7 +77,9 @@ class MainWindow(QMainWindow):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
-        panel_height = min(650, h - 150)
+
+        # UBAH DI SINI: Naikkan jadi 750px (atau sesuaikan tinggi layar)
+        panel_height = min(750, h - 120)
 
         self.sidebar.setGeometry(20, 100, 340, panel_height)
         self.info_panel.setGeometry(-360, 100, 340, panel_height)
@@ -124,7 +126,7 @@ class MainWindow(QMainWindow):
     def animate_panels(self, show_info):
         self.sidebar_anim.stop()
         self.info_anim.stop()
-        panel_height = min(650, self.height() - 150)
+        panel_height = min(750, self.height() - 120)
 
         if show_info:
             self.info_panel.show()
