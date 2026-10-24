@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
         self.current_atis_data = {}
         self.last_sidebar_update = 0
 
-        self.trail_manager = TrailManager(max_points=10000)
+        self.trail_manager = TrailManager(max_points=1500) # Dioptimasi
         self.current_trail_item = None
         self.follow_callsign = None
 
@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         self.map_controls = MapControls(self.view, self.view)
         self.bottom_toolbar = BottomToolbar(self.view)
 
-        # PANEL EMERGENCY BARU
+        # PANEL EMERGENCY
         self.alert_panel = EmergencyAlertPanel(self.view)
         self.alert_panel.alert_clicked.connect(self.focus_on_aircraft)
 
@@ -274,7 +274,6 @@ class MainWindow(QMainWindow):
         self.airport_panel.setGeometry(w, 100, 340, ph)
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
 
-        # POSISI PANEL EMERGENCY (Di kanan bawah, di atas toolbar)
         self.alert_panel.setGeometry(w - 320, h - 260, 300, 160)
 
         tb_w = 400
@@ -431,7 +430,6 @@ class MainWindow(QMainWindow):
         self.current_data = filtered_data
         active_callsigns = set(filtered_data.keys())
 
-        # KUNCI: Daftar untuk Emergency Alert
         emergencies = []
 
         for callsign, info in filtered_data.items():
@@ -441,7 +439,6 @@ class MainWindow(QMainWindow):
             alt = info.get("altitude", 0)
             ac_type = info.get("aircraftType", "")
 
-            # Ambil status emergency
             is_emergency = info.get("isEmergency", False)
             if is_emergency:
                 emergencies.append(callsign)
@@ -456,11 +453,9 @@ class MainWindow(QMainWindow):
                 self.scene.addItem(plane)
                 self.aircraft_items[callsign] = plane
 
-            # Kirim status emergency ke item pesawat
             self.aircraft_items[callsign].update_data(x, y, heading, ac_type, label_text, is_emergency)
             self.trail_manager.add_point(callsign, x, y, alt)
 
-        # KUNCI: Perbarui panel alert di pojok layar
         self.alert_panel.update_alerts(emergencies)
 
         if self.follow_callsign and self.follow_callsign in self.aircraft_items:
