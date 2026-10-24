@@ -26,7 +26,7 @@ QFrame#FlightPanel:hover {
     border: 1px solid #f4b400;
 }
 
-/* --- SCROLLBAR --- */
+/* --- SCROLLBAR CUSTOM --- */
 QScrollArea {
     border: none;
     background: transparent;
@@ -60,17 +60,6 @@ QLineEdit#SearchBar {
     padding: 10px 20px;
     font-size: 14px;
     border: none;
-}
-QPushButton#ViewMapBtn {
-    background-color: rgba(30, 30, 30, 0.85);
-    color: white;
-    border-radius: 20px;
-    padding: 10px 20px;
-    font-weight: bold;
-    border: 1px solid #444;
-}
-QPushButton#ViewMapBtn:hover {
-    background-color: rgba(50, 50, 50, 0.85);
 }
 QFrame#BottomToolbar {
     background-color: rgba(25, 25, 25, 0.95);
@@ -151,18 +140,6 @@ QLabel#RouteCode {
     font-weight: bold;
     color: white;
 }
-
-/* --- PHOTO PLACEHOLDER --- */
-QLabel#PhotoBox {
-    background-color: #222;
-    border: 1px solid #444;
-    border-radius: 6px;
-    color: #555;
-    font-size: 48px;
-    font-weight: bold;
-}
-
-/* --- TELEMETRY BOXES (BORDERED) --- */
 QFrame#TelemetryBox {
     background-color: #222;
     border: 1px solid #333;
@@ -178,12 +155,10 @@ QLabel#DataValue {
     font-size: 16px;
     font-weight: bold;
 }
-
-/* --- COPY BUTTON --- */
 QPushButton#CopyBtn {
     background-color: transparent;
     border: none;
-    color: #4ade80; /* Hijau */
+    color: #4ade80;
     font-size: 14px;
     font-weight: bold;
     text-align: left;
@@ -191,5 +166,40 @@ QPushButton#CopyBtn {
 QPushButton#CopyBtn:hover {
     color: #86efac;
     text-decoration: underline;
+}
+
+/* --- POPUP PANEL (FILTERS/SETTINGS/WEATHER) --- */
+QFrame#PopupPanel {
+    background-color: #1e1e1e; /* Warna solid, tidak transparan */
+    border-radius: 12px;
+    border: 1px solid #555;    /* Border tegas */
+}
+QCheckBox {
+    color: #e0e0e0;
+    font-size: 13px;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid #666;
+    background: #111;
+}
+QCheckBox::indicator:checked {
+    background: #f4b400;
+    border: 1px solid #f4b400;
+}
+QSlider::groove:horizontal {
+    height: 4px;
+    background: #333;
+    border-radius: 2px;
+}
+QSlider::handle:horizontal {
+    background: #f4b400;
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
 }
 """

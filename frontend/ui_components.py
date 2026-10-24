@@ -3,11 +3,12 @@
 import os
 import re
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout, QApplication, QSizePolicy)
+                               QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout,
+                               QApplication, QSizePolicy, QCheckBox, QSlider)
 from PySide6.QtCore import Qt, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QPen, QColor
 from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao
-from frontend.airports import get_airport_name # <-- IMPORT NAMA BANDARA
+from frontend.airports import get_airport_name
 
 def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
     if not os.path.exists(photo_dir): return None
@@ -35,6 +36,7 @@ def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
         if os.path.isfile(path): return path
     return None
 
+# ================= TOP BAR =================
 class TopBar(QWidget):
     search_triggered = Signal(str)
     def __init__(self, parent=None):
@@ -56,6 +58,7 @@ class TopBar(QWidget):
         query = self.search_bar.text().strip()
         if query: self.search_triggered.emit(query)
 
+# ================= SIDEBAR KIRI =================
 class FlightPanel(QFrame):
     clicked = Signal(str)
     def __init__(self, parent=None):
@@ -98,10 +101,8 @@ class FlightPanel(QFrame):
         self.lbl_type.setText(ac_type)
         self.lbl_speed.setText(f"{int(info.get('speed', 0))} kts")
 
-        # HANYA KODE ICAO SAJA
         dep_code = info.get("plan_departing", "")
         arr_code = info.get("plan_arriving", "")
-
         if dep_code and arr_code:
             self.lbl_route.setText(f"{dep_code} - {arr_code}")
         else:
@@ -149,6 +150,7 @@ class Sidebar(QFrame):
                 panel.show()
             else: panel.hide()
 
+# ================= PANEL INFO PESAWAT =================
 class FlightInfoPanel(QFrame):
     closed = Signal()
     def __init__(self, parent=None):
@@ -186,13 +188,11 @@ class FlightInfoPanel(QFrame):
         photo_layout = QVBoxLayout(photo_frame)
         photo_layout.setContentsMargins(15, 15, 15, 0)
         self.photo_box = QLabel("?")
-        self.photo_box.setObjectName("PhotoBox")
-        self.photo_box.setFixedSize(310, 180) # Kunci ukuran agar tidak melar
+        self.photo_box.setFixedSize(310, 210)
         self.photo_box.setAlignment(Qt.AlignCenter)
         photo_layout.addWidget(self.photo_box, alignment=Qt.AlignHCenter)
         main_layout.addWidget(photo_frame)
 
-        # ROUTE SECTION
         route_frame = QFrame()
         route_layout = QHBoxLayout(route_frame)
         route_layout.setContentsMargins(15, 15, 15, 15)
@@ -203,7 +203,6 @@ class FlightInfoPanel(QFrame):
         self.lbl_dep = QLabel("N/A")
         self.lbl_dep.setObjectName("RouteCode")
         self.lbl_dep.setAlignment(Qt.AlignCenter)
-
         self.lbl_dep_name = QLabel("")
         self.lbl_dep_name.setStyleSheet("color: #888; font-size: 10px; font-weight: bold;")
         self.lbl_dep_name.setAlignment(Qt.AlignCenter)
@@ -219,7 +218,6 @@ class FlightInfoPanel(QFrame):
         self.lbl_arr = QLabel("N/A")
         self.lbl_arr.setObjectName("RouteCode")
         self.lbl_arr.setAlignment(Qt.AlignCenter)
-
         self.lbl_arr_name = QLabel("")
         self.lbl_arr_name.setStyleSheet("color: #888; font-size: 10px; font-weight: bold;")
         self.lbl_arr_name.setAlignment(Qt.AlignCenter)
@@ -242,6 +240,7 @@ class FlightInfoPanel(QFrame):
         main_layout.addWidget(telemetry_frame)
 
         main_layout.addStretch()
+
         pilot_frame = QFrame()
         pilot_frame.setStyleSheet("background-color: #111; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
         pilot_layout = QVBoxLayout(pilot_frame)
@@ -255,7 +254,7 @@ class FlightInfoPanel(QFrame):
         pilot_layout.addWidget(lbl_p)
         pilot_layout.addWidget(self.btn_pilot)
         main_layout.addWidget(pilot_frame)
-        main_layout.addStretch()
+
         self.current_pilot_name = "Unknown"
 
     def create_telemetry_box(self, layout, row, col, title):
@@ -287,7 +286,6 @@ class FlightInfoPanel(QFrame):
         dep_code = info.get("plan_departing", "")
         arr_code = info.get("plan_arriving", "")
 
-        # KEMBALIKAN KE N/A JIKA KOSONG
         self.lbl_dep.setText(dep_code if dep_code else "N/A")
         self.lbl_arr.setText(arr_code if arr_code else "N/A")
 
@@ -303,12 +301,11 @@ class FlightInfoPanel(QFrame):
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
-        # ================= PERBAIKAN BORDER FOTO =================
         photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
         if photo_path:
             pixmap = QPixmap(photo_path)
             if not pixmap.isNull():
-                target_w, target_h = 310, 180
+                target_w, target_h = 310, 210
                 zoom_factor = 1.25
                 scale_w = int(target_w * zoom_factor)
                 scale_h = int(target_h * zoom_factor)
@@ -316,45 +313,135 @@ class FlightInfoPanel(QFrame):
                 x_offset = (scaled.width() - target_w) // 2
                 y_offset = (scaled.height() - target_h) // 2
                 cropped = scaled.copy(x_offset, y_offset, target_w, target_h)
-
                 rounded_pixmap = QPixmap(target_w, target_h)
                 rounded_pixmap.fill(Qt.transparent)
                 painter = QPainter(rounded_pixmap)
                 painter.setRenderHint(QPainter.Antialiasing)
-
-                # Gunakan 0.5 sebagai offset agar border 1px tidak terpotong
                 path = QPainterPath()
                 path.addRoundedRect(QRectF(0.5, 0.5, target_w - 1, target_h - 1), 6, 6)
-
-                # 1. Potong Gambar
                 painter.setClipPath(path)
                 painter.drawPixmap(0, 0, cropped)
-
-                # 2. MATIKAN CLIPPING SEBELUM GAMBAR BORDER
                 painter.setClipping(False)
-
-                # 3. Gambar Border di atas gambar yang sudah terpotong
                 pen = QPen(QColor("#444"))
                 pen.setWidth(1)
                 painter.setPen(pen)
-                painter.setBrush(Qt.NoBrush) # Jangan isi warna apapun
+                painter.setBrush(Qt.NoBrush)
                 painter.drawPath(path)
-
                 painter.end()
-
                 self.photo_box.setPixmap(rounded_pixmap)
                 self.photo_box.setText("")
-                self.photo_box.setStyleSheet("background-color: transparent; border: none;")
+                self.photo_box.setStyleSheet("background: transparent; border: none;")
             else:
-                self.photo_box.clear()
-                self.photo_box.setText("?")
-                self.photo_box.setStyleSheet("")
+                self.show_placeholder()
         else:
-            self.photo_box.clear()
-            self.photo_box.setText("?")
-            self.photo_box.setStyleSheet("")
+            self.show_placeholder()
 
+    def show_placeholder(self):
+        self.photo_box.clear()
+        self.photo_box.setText("?")
+        self.photo_box.setStyleSheet("background-color: #222; border: 1px solid #444; border-radius: 6px; color: #555; font-size: 48px; font-weight: bold;")
+
+# ================= PANEL POPUP =================
+class FilterPanel(QFrame):
+    filters_changed = Signal(bool, int, bool)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("PopupPanel") # <--- KUNCI UNTUK CSS
+        self.setVisible(False)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+        layout.addWidget(QLabel("FILTERS", objectName="HeaderText"))
+
+        self.chk_ground = QCheckBox("Hide Aircraft on Ground")
+        self.chk_ground.stateChanged.connect(self.emit)
+        layout.addWidget(self.chk_ground)
+
+        self.chk_heli = QCheckBox("Hide Helicopters")
+        self.chk_heli.stateChanged.connect(self.emit)
+        layout.addWidget(self.chk_heli)
+
+        layout.addWidget(QLabel("Min Altitude:"))
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setRange(0, 10000)
+        self.slider.valueChanged.connect(self.emit)
+        layout.addWidget(self.slider)
+
+        self.lbl_alt = QLabel("0 ft", objectName="AccentText")
+        self.slider.valueChanged.connect(lambda v: self.lbl_alt.setText(f"{v} ft"))
+        layout.addWidget(self.lbl_alt)
+
+    def emit(self):
+        self.filters_changed.emit(self.chk_ground.isChecked(), self.slider.value(), self.chk_heli.isChecked())
+
+class SettingsPanel(QFrame):
+    settings_changed = Signal(bool, bool, bool)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("PopupPanel") # <--- KUNCI UNTUK CSS
+        self.setVisible(False)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+        layout.addWidget(QLabel("SETTINGS", objectName="HeaderText"))
+
+        self.chk_bounds = QCheckBox("Show Airspace Boundaries")
+        self.chk_bounds.setChecked(True)
+        self.chk_bounds.stateChanged.connect(self.emit)
+        layout.addWidget(self.chk_bounds)
+
+        self.chk_trails = QCheckBox("Show Aircraft Trails")
+        self.chk_trails.setChecked(True)
+        self.chk_trails.stateChanged.connect(self.emit)
+        layout.addWidget(self.chk_trails)
+
+        self.chk_labels = QCheckBox("Always Show Labels")
+        self.chk_labels.stateChanged.connect(self.emit)
+        layout.addWidget(self.chk_labels)
+
+    def emit(self):
+        self.settings_changed.emit(self.chk_bounds.isChecked(), self.chk_trails.isChecked(), self.chk_labels.isChecked())
+
+class WeatherPanel(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("PopupPanel") # <--- KUNCI UNTUK CSS
+        self.setVisible(False)
+        self.setFixedWidth(300)
+        self.setFixedHeight(300)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.addWidget(QLabel("ACTIVE ATIS (WEATHER)", objectName="HeaderText"))
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet("background: transparent; border: none;")
+        self.content = QWidget()
+        self.content.setStyleSheet("background: transparent;")
+        self.content_layout = QVBoxLayout(self.content)
+        self.content_layout.setAlignment(Qt.AlignTop)
+        self.scroll.setWidget(self.content)
+        layout.addWidget(self.scroll)
+
+    def update_atis(self, atis_dict):
+        for i in reversed(range(self.content_layout.count())):
+            widget = self.content_layout.itemAt(i).widget()
+            if widget: widget.deleteLater()
+
+        if not atis_dict:
+            self.content_layout.addWidget(QLabel("No active ATIS."))
+            return
+
+        for icao, data in atis_dict.items():
+            lbl = QLabel(f"[{icao}] {data.get('content', 'No Info')}")
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet("color: #ccc; font-family: monospace; font-size: 11px; border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 5px;")
+            self.content_layout.addWidget(lbl)
+
+# ================= TOOLBAR BAWAH =================
 class BottomToolbar(QFrame):
+    tool_clicked = Signal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("BottomToolbar")
@@ -362,10 +449,12 @@ class BottomToolbar(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 5, 20, 5)
         layout.setSpacing(10)
-        buttons = ["Settings", "Weather", "Filters", "Widgets", "Playback"]
+
+        buttons = ["Settings", "Weather", "Filters", "Widgets"]
         for text in buttons:
             btn = QPushButton(text)
             btn.setObjectName("ToolBtn")
+            btn.clicked.connect(lambda checked, t=text: self.tool_clicked.emit(t))
             layout.addWidget(btn)
 
 class MapControls(QWidget):

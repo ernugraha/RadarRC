@@ -7,7 +7,6 @@ from PySide6.QtGui import QPainter, QPolygonF, QBrush, QColor, QPen, QPainterPat
 from PySide6.QtSvg import QSvgRenderer
 
 _SVG_CACHE = {}
-
 AIRCRAFT_CATEGORIES = {
     "an225": ["AN-225", "A225"], "concorde": ["CONCORDE", "CONC"],
     "four_engine_wing_on_top": ["DREAMLIFTER", "BLCF", "A124", "C-17", "C17"],
@@ -47,6 +46,7 @@ class AircraftItem(QGraphicsItem):
         self.icon_size = 20
 
         self.is_hovered = False
+        self.always_show_label = False # <-- TAMBAHAN UNTUK SETTINGS
         self.label_text = callsign.split("-")[0] if "-" in callsign else callsign
 
         self.setFlag(QGraphicsItem.ItemIsSelectable)
@@ -106,108 +106,60 @@ class AircraftItem(QGraphicsItem):
                 QPointF(0, s * 0.6), QPointF(-s * 0.8, s * 1.0)
             ]))
 
-        if self.isSelected() or self.is_hovered:
+        if self.isSelected() or self.is_hovered or self.always_show_label:
             painter.save()
             painter.rotate(-self.heading)
-
             font = QFont("Arial", 8, QFont.Bold)
             painter.setFont(font)
-
             metrics = painter.fontMetrics()
             text_width = metrics.horizontalAdvance(self.label_text) + 8
             text_height = metrics.height() + 2
-
-            label_x = 10
-            label_y = -text_height / 2
-
-            label_rect = QRectF(label_x, label_y, text_width, text_height)
+            label_rect = QRectF(10, -text_height / 2, text_width, text_height)
             painter.setPen(QPen(QColor(180, 180, 180), 1))
             painter.setBrush(QBrush(QColor(255, 255, 255, 230)))
             painter.drawRoundedRect(label_rect, 3, 3)
-
             painter.setPen(QPen(QColor(0, 0, 0)))
             painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
-
             painter.restore()
 
+# ... (TrailItem biarkan sama seperti sebelumnya) ...
 class TrailItem(QGraphicsItem):
     def __init__(self):
         super().__init__()
         self.setZValue(-0.5)
         self.trail_points = []
-
     def set_points(self, points):
-        if len(points) < 3:
-            self.trail_points = points
-            self.update()
-            return
-
+        if len(points) < 3: self.trail_points = points; self.update(); return
         pts = points
         for _ in range(2):
-            new_pts = []
-            new_pts.append(pts[0])
+            new_pts = [pts[0]]
             for i in range(len(pts) - 1):
-                p0 = pts[i]
-                p1 = pts[i+1]
-                q_x = p0["x"] * 0.75 + p1["x"] * 0.25
-                q_y = p0["y"] * 0.75 + p1["y"] * 0.25
-                q_alt = p0["alt"] * 0.75 + p1["alt"] * 0.25
-                r_x = p0["x"] * 0.25 + p1["x"] * 0.75
-                r_y = p0["y"] * 0.25 + p1["y"] * 0.75
-                r_alt = p0["alt"] * 0.25 + p1["alt"] * 0.75
-                new_pts.append({"x": q_x, "y": q_y, "alt": q_alt})
-                new_pts.append({"x": r_x, "y": r_y, "alt": r_alt})
+                p0, p1 = pts[i], pts[i+1]
+                new_pts.append({"x": p0["x"]*0.75 + p1["x"]*0.25, "y": p0["y"]*0.75 + p1["y"]*0.25, "alt": p0["alt"]*0.75 + p1["alt"]*0.25})
+                new_pts.append({"x": p0["x"]*0.25 + p1["x"]*0.75, "y": p0["y"]*0.25 + p1["y"]*0.75, "alt": p0["alt"]*0.25 + p1["alt"]*0.75})
             new_pts.append(pts[-1])
             pts = new_pts
-
         self.trail_points = pts
         self.update()
-
     def boundingRect(self):
         if not self.trail_points: return QRectF()
-        min_x = min(p["x"] for p in self.trail_points) / 100.0
-        max_x = max(p["x"] for p in self.trail_points) / 100.0
-        min_y = min(p["y"] for p in self.trail_points) / 100.0
-        max_y = max(p["y"] for p in self.trail_points) / 100.0
-        return QRectF(min_x - 20, min_y - 20, (max_x - min_x) + 40, (max_y - min_y) + 40)
-
+        return QRectF(min(p["x"] for p in self.trail_points)/100-20, min(p["y"] for p in self.trail_points)/100-20, (max(p["x"] for p in self.trail_points)-min(p["x"] for p in self.trail_points))/100+40, (max(p["y"] for p in self.trail_points)-min(p["y"] for p in self.trail_points))/100+40)
     def paint(self, painter, option, widget=None):
         if len(self.trail_points) < 2: return
         painter.setRenderHint(QPainter.Antialiasing)
-
-        line_width = 3.0
-
         for i in range(1, len(self.trail_points)):
-            p1 = self.trail_points[i-1]
-            p2 = self.trail_points[i]
-
-            avg_alt = (p1["alt"] + p2["alt"]) / 2.0
-            color = self._get_smooth_color(avg_alt)
-
-            pen = QPen(color)
-            pen.setWidthF(line_width)
-            pen.setCosmetic(True)
-            pen.setCapStyle(Qt.RoundCap)
-            pen.setJoinStyle(Qt.RoundJoin)
+            p1, p2 = self.trail_points[i-1], self.trail_points[i]
+            color = self._get_smooth_color((p1["alt"] + p2["alt"]) / 2.0)
+            pen = QPen(color); pen.setWidthF(3.0); pen.setCosmetic(True); pen.setCapStyle(Qt.RoundCap); pen.setJoinStyle(Qt.RoundJoin)
             painter.setPen(pen)
-
-            pt1 = QPointF(p1["x"] / 100.0, p1["y"] / 100.0)
-            pt2 = QPointF(p2["x"] / 100.0, p2["y"] / 100.0)
-
-            painter.drawLine(pt1, pt2)
-
+            painter.drawLine(QPointF(p1["x"]/100, p1["y"]/100), QPointF(p2["x"]/100, p2["y"]/100))
     def _get_smooth_color(self, alt):
-        keys = [
-            (0, 255, 255, 255), (1000, 244, 180, 0), (2500, 76, 175, 80),
-            (4000, 0, 188, 212), (5500, 33, 150, 243), (7000, 156, 39, 176), (9000, 244, 67, 54)
-        ]
-        if alt <= 0: return QColor(255, 255, 255)
-        if alt >= 9000: return QColor(244, 67, 54)
-
+        keys = [(0,255,255,255), (1000,244,180,0), (2500,76,175,80), (4000,0,188,212), (5500,33,150,243), (7000,156,39,176), (9000,244,67,54)]
+        if alt <= 0: return QColor(255,255,255)
+        if alt >= 9000: return QColor(244,67,54)
         for i in range(len(keys) - 1):
-            alt1, r1, g1, b1 = keys[i]
-            alt2, r2, g2, b2 = keys[i+1]
-            if alt1 <= alt <= alt2:
-                ratio = (alt - alt1) / (alt2 - alt1)
-                return QColor(int(r1 + (r2 - r1) * ratio), int(g1 + (g2 - g1) * ratio), int(b1 + (b2 - b1) * ratio))
-        return QColor(255, 255, 255)
+            a1, r1, g1, b1 = keys[i]; a2, r2, g2, b2 = keys[i+1]
+            if a1 <= alt <= a2:
+                rat = (alt - a1) / (a2 - a1)
+                return QColor(int(r1+(r2-r1)*rat), int(g1+(g2-g1)*rat), int(b1+(b2-b1)*rat))
+        return QColor(255,255,255)

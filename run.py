@@ -25,8 +25,14 @@ def main():
     # Tampilkan log status koneksi ke terminal
     client.connection_status.connect(lambda msg: print(msg))
 
-    # Hubungkan data pesawat dari backend ke fungsi update UI
+    # Hubungkan data ke UI
     client.aircraft_data_received.connect(window.update_aircraft)
+
+    # HUBUNGKAN SINYAL BARU UNTUK FITUR WEATHER
+    client.atis_data_received.connect(window.update_atis)
+
+    # (Opsional) Jika Anda ingin fitur ATC di masa depan:
+    # client.controllers_data_received.connect(window.update_controllers)
 
     # 4. Jalankan koneksi WebSocket di background
     loop.create_task(client.connect())
