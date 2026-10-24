@@ -2,7 +2,7 @@
 
 import os
 import time
-from PySide6.QtWidgets import QMainWindow, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QFrame
+from PySide6.QtWidgets import QMainWindow, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QFrame, QGraphicsOpacityEffect
 from PySide6.QtGui import QColor, QPen, QPixmap, QTransform
 from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
 
@@ -31,11 +31,10 @@ class MainWindow(QMainWindow):
         self.trail_manager = TrailManager(max_points=10000)
         self.current_trail_item = None
 
-        # State Variables untuk Filter & Settings
+        # State Variables
         self.filter_hide_ground = False
         self.filter_min_alt = 0
         self.filter_hide_heli = False
-
         self.show_boundaries = True
         self.show_trails = True
         self.show_all_labels = False
@@ -71,7 +70,7 @@ class MainWindow(QMainWindow):
         self.filter_panel.filters_changed.connect(self.apply_filters)
         self.settings_panel.settings_changed.connect(self.apply_settings)
 
-        # Animasi
+        # Animasi Sidebar
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
         self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -85,24 +84,71 @@ class MainWindow(QMainWindow):
         self.info_panel.hide()
 
     def on_tool_clicked(self, tool_name):
-        # Sembunyikan semua popup dulu
-        self.filter_panel.hide()
-        self.settings_panel.hide()
-        self.weather_panel.hide()
+        # Sembunyikan semua popup dulu dengan animasi
+        self.hide_all_popups()
 
         if tool_name == "Filters":
-            self.filter_panel.show()
-            self.filter_panel.raise_()
+            self.animate_popup(self.filter_panel, True)
         elif tool_name == "Settings":
-            self.settings_panel.show()
-            self.settings_panel.raise_()
+            self.animate_popup(self.settings_panel, True)
         elif tool_name == "Weather":
             self.weather_panel.update_atis(self.current_atis_data)
-            self.weather_panel.show()
-            self.weather_panel.raise_()
+            self.animate_popup(self.weather_panel, True)
         elif tool_name == "Widgets":
             self.sidebar_visible = not self.sidebar_visible
-            self.resizeEvent(None) # Trigger animasi/resize
+            self.resizeEvent(None) # Trigger animasi resize
+
+    def hide_all_popups(self):
+        self.animate_popup(self.filter_panel, False)
+        self.animate_popup(self.settings_panel, False)
+        self.animate_popup(self.weather_panel, False)
+
+    def animate_popup(self, panel, show):
+        # Hentikan animasi jika ada yang sedang berjalan
+        if hasattr(panel, 'anim_opacity'): panel.anim_opacity.stop()
+        if hasattr(panel, 'anim_geom'): panel.anim_geom.stop()
+
+        panel.setVisible(True) # Harus visible untuk animasi opacity
+        opacity_effect = QGraphicsOpacityEffect(panel)
+        panel.setGraphicsEffect(opacity_effect)
+
+        panel.anim_opacity = QPropertyAnimation(opacity_effect, b"opacity")
+        panel.anim_opacity.setDuration(250)
+
+        # Posisi dari kode resizeEvent sebelumnya
+        w = self.width()
+        h = self.height()
+        tb_w = 400
+        tb_x = (w - tb_w) // 2
+        tb_y = h - 90
+        popup_w = panel.width()
+        popup_h = panel.height()
+
+        # Posisi Akhir (Muncul di atas toolbar)
+        end_rect = QRect(tb_x + (tb_w - popup_w)//2, tb_y - popup_h - 10, popup_w, popup_h)
+        # Posisi Awal (Tersembunyi 20px lebih rendah)
+        start_rect = QRect(end_rect.x(), end_rect.y() + 20, end_rect.width(), end_rect.height())
+
+        panel.anim_geom = QPropertyAnimation(panel, b"geometry")
+        panel.anim_geom.setDuration(250)
+        panel.anim_geom.setEasingCurve(QEasingCurve.OutCubic)
+
+        if show:
+            panel.setGeometry(start_rect)
+            panel.anim_opacity.setStartValue(0.0)
+            panel.anim_opacity.setEndValue(1.0)
+            panel.anim_geom.setStartValue(start_rect)
+            panel.anim_geom.setEndValue(end_rect)
+        else:
+            panel.anim_opacity.setStartValue(1.0)
+            panel.anim_opacity.setEndValue(0.0)
+            panel.anim_geom.setStartValue(panel.geometry())
+            panel.anim_geom.setEndValue(start_rect)
+            # Sembunyikan panel sepenuhnya setelah animasi selesai
+            panel.anim_opacity.finished.connect(lambda: panel.setVisible(False))
+
+        panel.anim_opacity.start()
+        panel.anim_geom.start()
 
     def apply_filters(self, hide_ground, min_alt, hide_heli):
         self.filter_hide_ground = hide_ground
@@ -144,13 +190,6 @@ class MainWindow(QMainWindow):
         tb_x = (w - tb_w) // 2
         tb_y = h - 90
         self.bottom_toolbar.setGeometry(tb_x, tb_y, tb_w, 60)
-
-        # Posisi Popup
-        popup_w = 280
-        popup_h = 180
-        self.filter_panel.setGeometry(tb_x + (tb_w - popup_w)//2, tb_y - popup_h - 10, popup_w, popup_h)
-        self.settings_panel.setGeometry(tb_x + (tb_w - popup_w)//2, tb_y - popup_h - 10, popup_w, popup_h)
-        self.weather_panel.setGeometry(tb_x + (tb_w - 300)//2, tb_y - 310, 300, 300)
 
     def setup_map(self):
         self.scene.setBackgroundBrush(QColor("#131313"))
@@ -245,7 +284,6 @@ class MainWindow(QMainWindow):
             if self.filter_hide_ground and info.get("isOnGround", False): continue
             if info.get("altitude", 0) < self.filter_min_alt: continue
             if self.filter_hide_heli and info.get("aircraftType", "").upper().startswith("H"): continue
-
             filtered_data[callsign] = info
 
         self.current_data = filtered_data
