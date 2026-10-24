@@ -20,9 +20,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("RadarRC")
         self.resize(1400, 900)
+        # KUNCI: Mencegah jendela dikecilkan terlalu ekstrem hingga UI rusak
+        self.setMinimumSize(1000, 600)
         self.setStyleSheet(MAIN_STYLESHEET)
 
-        # KUNCI PERBAIKAN: Memuat dari folder 'planes'
         load_icons("assets/planes")
 
         self.aircraft_items = {}
@@ -52,7 +53,6 @@ class MainWindow(QMainWindow):
 
         self.setup_map()
 
-        # Hubungkan sinyal interaksi manual peta
         self.view.user_panned.connect(self.stop_following)
 
         # Inisialisasi UI
@@ -89,6 +89,13 @@ class MainWindow(QMainWindow):
         self.resizeEvent(None)
         self.sidebar.show()
         self.info_panel.hide()
+
+    def get_panel_height(self):
+        """Menghitung tinggi panel secara dinamis agar tidak menabrak toolbar bawah."""
+        # 100px dari atas, 90px dari bawah (untuk toolbar dan margin)
+        available_height = self.height() - 190
+        # Minimal tinggi panel 200px agar tetap terlihat, maksimal 750px
+        return max(200, min(750, available_height))
 
     def stop_following(self):
         self.follow_callsign = None
@@ -138,7 +145,7 @@ class MainWindow(QMainWindow):
         h = self.height()
         tb_w = 400
         tb_x = (w - tb_w) // 2
-        tb_y = h - 90
+        tb_y = h - 80 # Sesuaikan dengan posisi toolbar baru
 
         popup_w = panel.width() if panel.width() > 0 else 280
         popup_h = panel.height() if panel.height() > 0 else 180
@@ -156,14 +163,14 @@ class MainWindow(QMainWindow):
         panel.anim_geom.start()
 
     def update_sidebar_animation(self):
-        panel_height = min(750, self.height() - 120)
+        ph = self.get_panel_height()
         self.sidebar_anim.stop()
         self.sidebar_anim.setStartValue(self.sidebar.geometry())
 
         if self.sidebar_visible:
-            self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            self.sidebar_anim.setEndValue(QRect(20, 100, 340, ph))
         else:
-            self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+            self.sidebar_anim.setEndValue(QRect(-360, 100, 340, ph))
 
         self.sidebar_anim.start()
 
@@ -193,19 +200,20 @@ class MainWindow(QMainWindow):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
-        panel_height = min(750, h - 120)
+
+        ph = self.get_panel_height()
 
         if self.sidebar_visible:
-            self.sidebar.setGeometry(20, 100, 340, panel_height)
+            self.sidebar.setGeometry(20, 100, 340, ph)
         else:
-            self.sidebar.setGeometry(-360, 100, 340, panel_height)
+            self.sidebar.setGeometry(-360, 100, 340, ph)
 
-        self.info_panel.setGeometry(-360, 100, 340, panel_height)
+        self.info_panel.setGeometry(-360, 100, 340, ph)
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
 
         tb_w = 400
         tb_x = (w - tb_w) // 2
-        tb_y = h - 90
+        tb_y = h - 80 # Toolbar selalu menempel 80px dari dasar layar
         self.bottom_toolbar.setGeometry(tb_x, tb_y, tb_w, 60)
 
     def setup_map(self):
@@ -266,27 +274,27 @@ class MainWindow(QMainWindow):
     def animate_panels(self, show_info):
         self.sidebar_anim.stop()
         self.info_anim.stop()
-        panel_height = min(750, self.height() - 120)
+        ph = self.get_panel_height()
 
         if show_info:
             self.info_panel.show()
             self.sidebar_anim.setStartValue(self.sidebar.geometry())
-            self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+            self.sidebar_anim.setEndValue(QRect(-360, 100, 340, ph))
 
             self.info_anim.setStartValue(self.info_panel.geometry())
-            self.info_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            self.info_anim.setEndValue(QRect(20, 100, 340, ph))
 
             self.sidebar_anim.start()
             self.info_anim.start()
         else:
             self.sidebar_anim.setStartValue(self.sidebar.geometry())
             if self.sidebar_visible:
-                self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+                self.sidebar_anim.setEndValue(QRect(20, 100, 340, ph))
             else:
-                self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+                self.sidebar_anim.setEndValue(QRect(-360, 100, 340, ph))
 
             self.info_anim.setStartValue(self.info_panel.geometry())
-            self.info_anim.setEndValue(QRect(-360, 100, 340, panel_height))
+            self.info_anim.setEndValue(QRect(-360, 100, 340, ph))
 
             self.sidebar_anim.start()
             self.info_anim.start()
