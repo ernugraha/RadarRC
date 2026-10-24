@@ -170,36 +170,51 @@ QPushButton#CopyBtn:hover {
 
 /* --- POPUP PANEL (FILTERS/SETTINGS/WEATHER) --- */
 QFrame#PopupPanel {
-    background-color: #1e1e1e; /* Warna solid, tidak transparan */
+    background-color: #1e1e1e;
     border-radius: 12px;
-    border: 1px solid #555;    /* Border tegas */
+    border: 1px solid #555;
 }
+
+/* Checkbox Modern */
 QCheckBox {
     color: #e0e0e0;
     font-size: 13px;
-    spacing: 8px;
+    spacing: 10px;
 }
 QCheckBox::indicator {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    border: 1px solid #666;
-    background: #111;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #555;
+    background: #1e1e1e;
+}
+QCheckBox::indicator:hover {
+    border: 2px solid #f4b400;
 }
 QCheckBox::indicator:checked {
     background: #f4b400;
-    border: 1px solid #f4b400;
+    border: 2px solid #f4b400;
 }
+
+/* Slider Modern */
 QSlider::groove:horizontal {
-    height: 4px;
+    height: 6px;
     background: #333;
-    border-radius: 2px;
+    border-radius: 3px;
+}
+QSlider::sub-page:horizontal {
+    background: #f4b400;
+    border-radius: 3px;
 }
 QSlider::handle:horizontal {
     background: #f4b400;
-    width: 14px;
-    height: 14px;
-    margin: -5px 0;
-    border-radius: 7px;
+    width: 18px;
+    height: 18px;
+    margin: -6px 0;
+    border-radius: 9px;
+    border: 2px solid #1e1e1e;
+}
+QSlider::handle:horizontal:hover {
+    background: #ffc400;
 }
 """
