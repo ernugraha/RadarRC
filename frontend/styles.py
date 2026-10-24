@@ -26,7 +26,7 @@ QFrame#FlightPanel:hover {
     border: 1px solid #f4b400;
 }
 
-/* --- SCROLLBAR CUSTOM --- */
+/* --- SCROLLBAR CUSTOM (DITIPISKAN) --- */
 QScrollArea {
     border: none;
     background: transparent;
@@ -34,13 +34,13 @@ QScrollArea {
 QScrollBar:vertical {
     border: none;
     background: transparent;
-    width: 6px;
+    width: 4px; /* <-- Lebar scrollbar dibuat sangat tipis */
     margin: 0px;
 }
 QScrollBar::handle:vertical {
     background: #f4b400;
     min-height: 30px;
-    border-radius: 3px;
+    border-radius: 2px; /* Ujung membulat */
 }
 QScrollBar::handle:vertical:hover {
     background: #ffc400;
@@ -140,9 +140,11 @@ QLabel#RouteCode {
     font-weight: bold;
     color: white;
 }
+
+/* --- TELEMETRY BOX (BORDER DIPERTEGAS) --- */
 QFrame#TelemetryBox {
     background-color: #222;
-    border: 1px solid #333;
+    border: 1px solid #444;
     border-radius: 6px;
 }
 QLabel#DataLabel {
@@ -174,8 +176,6 @@ QFrame#PopupPanel {
     border-radius: 12px;
     border: 1px solid #555;
 }
-
-/* Checkbox Modern */
 QCheckBox {
     color: #e0e0e0;
     font-size: 13px;
@@ -195,8 +195,6 @@ QCheckBox::indicator:checked {
     background: #f4b400;
     border: 2px solid #f4b400;
 }
-
-/* Slider Modern */
 QSlider::groove:horizontal {
     height: 6px;
     background: #333;
