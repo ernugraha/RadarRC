@@ -24,16 +24,22 @@ class TopBar(QWidget):
         layout.addWidget(view_btn)
 
 class FlightPanel(QFrame):
-    """Panel individual yang mengupdate teksnya sendiri (Anti-Crash)."""
+    # Sinyal yang membawa data callsign asli saat di-klik
+    clicked = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("FlightPanel")
         self.setFixedHeight(65)
+        self.setCursor(Qt.PointingHandCursor) # Ubah kursor jadi tangan saat hover
+
+        self.original_callsign = "" # Simpan callsign asli dari server
+
         p_layout = QVBoxLayout(self)
         p_layout.setContentsMargins(10, 8, 10, 8)
         p_layout.setSpacing(2)
 
-        # Baris 1
+        # Baris 1: Callsign, Tipe, Kecepatan
         row1 = QHBoxLayout()
         self.lbl_callsign = QLabel("CALLSIGN")
         self.lbl_callsign.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
@@ -41,15 +47,15 @@ class FlightPanel(QFrame):
         self.lbl_type = QLabel("TYPE")
         self.lbl_type.setStyleSheet("color: #aaa; font-size: 11px; font-weight: bold; margin-left: 5px;")
 
-        self.lbl_alt = QLabel("0000")
-        self.lbl_alt.setObjectName("AccentText")
+        self.lbl_speed = QLabel("0 kts")
+        self.lbl_speed.setObjectName("AccentText")
 
         row1.addWidget(self.lbl_callsign)
         row1.addWidget(self.lbl_type)
         row1.addStretch()
-        row1.addWidget(self.lbl_alt)
+        row1.addWidget(self.lbl_speed)
 
-        # Baris 2
+        # Baris 2: Rute
         self.lbl_route = QLabel("N/A - N/A")
         self.lbl_route.setObjectName("SubText")
 
@@ -57,20 +63,32 @@ class FlightPanel(QFrame):
         p_layout.addWidget(self.lbl_route)
 
     def set_data(self, callsign, info):
+        self.original_callsign = callsign # Simpan untuk dikirim saat diklik
+
         clean_callsign = callsign.split("-")[0] if "-" in callsign else callsign
         self.lbl_callsign.setText(clean_callsign)
 
         ac_type = info.get("aircraftType", "Unknown")
         self.lbl_type.setText(ac_type.upper())
 
-        alt = info.get("altitude", 0)
-        self.lbl_alt.setText(f"{int(alt):,}")
+        # Ubah kecepatan menjadi string, bulatkan angkanya
+        speed = int(info.get("speed", 0))
+        self.lbl_speed.setText(f"{speed} kts")
 
         dep = info.get("plan_departing", "N/A")
         arr = info.get("plan_arriving", "N/A")
         self.lbl_route.setText(f"{dep} - {arr}")
 
+    def mousePressEvent(self, event):
+        """Deteksi klik pada panel ini."""
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.original_callsign)
+        super().mousePressEvent(event)
+
 class Sidebar(QFrame):
+    # Sinyal yang diteruskan ke MainWindow
+    flight_clicked = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
@@ -78,7 +96,8 @@ class Sidebar(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
 
-        header = QLabel("Most tracked flights")
+        # Ganti Judul
+        header = QLabel("Current Flights")
         header.setObjectName("HeaderText")
         layout.addWidget(header)
 
@@ -93,28 +112,28 @@ class Sidebar(QFrame):
         self.list_layout.setSpacing(8)
         self.list_layout.setAlignment(Qt.AlignTop)
 
-        # KUNCI: Pre-allocate 30 panel di awal. Tidak akan pernah dihapus.
         self.panels = []
         for _ in range(30):
             p = FlightPanel()
+            # Hubungkan sinyal klik panel ke sinyal sidebar
+            p.clicked.connect(self.flight_clicked.emit)
             self.panels.append(p)
             self.list_layout.addWidget(p)
-            p.hide() # Sembunyikan dulu
+            p.hide()
 
         self.scroll_area.setWidget(self.list_widget)
         layout.addWidget(self.scroll_area)
 
     def update_data(self, data_dict):
-        # Urutkan berdasarkan ketinggian tertinggi
         sorted_data = sorted(data_dict.items(), key=lambda x: x[1].get("altitude", 0), reverse=True)
 
         for i, panel in enumerate(self.panels):
             if i < len(sorted_data):
                 callsign, info = sorted_data[i]
                 panel.set_data(callsign, info)
-                panel.show() # Tampilkan
+                panel.show()
             else:
-                panel.hide() # Sembunyikan jika data kurang dari 30
+                panel.hide()
 
 class FlightInfoPanel(QFrame):
     closed = Signal()
@@ -148,7 +167,6 @@ class FlightInfoPanel(QFrame):
         layout.addStretch()
 
     def set_flight_data(self, callsign, info):
-        # Bersihkan layout dengan aman
         while self.content_layout.count():
             item = self.content_layout.takeAt(0)
             if item.widget():

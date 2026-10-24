@@ -39,7 +39,9 @@ class MainWindow(QMainWindow):
         self.info_panel.closed.connect(self.close_info_panel)
         self.scene.selectionChanged.connect(self.on_aircraft_selected)
 
-        # Animasi
+        # Hubungkan klik dari sidebar ke fungsi fokus kamera
+        self.sidebar.flight_clicked.connect(self.focus_on_aircraft)
+
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
         self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -56,13 +58,9 @@ class MainWindow(QMainWindow):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
-
-        # Tinggi sidebar max 500px (tidak terlalu panjang)
         panel_height = min(600, h - 200)
-
         self.sidebar.setGeometry(20, 100, 340, panel_height)
         self.info_panel.setGeometry(-360, 100, 340, panel_height)
-
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
         tb_w = 500
         self.bottom_toolbar.setGeometry((w - tb_w)//2, h - 90, tb_w, 60)
@@ -92,6 +90,18 @@ class MainWindow(QMainWindow):
         self.view.centerOn(0, 0)
         self.view.scale(0.5, 0.5)
 
+    def focus_on_aircraft(self, callsign):
+        """Dipicu saat item di sidebar diklik."""
+        if callsign in self.aircraft_items:
+            item = self.aircraft_items[callsign]
+
+            # 1. Pilih pesawat di peta (memicu panel info terbuka)
+            self.scene.clearSelection()
+            item.setSelected(True)
+
+            # 2. Geser kamera peta agar fokus ke pesawat tersebut
+            self.view.centerOn(item)
+
     def on_aircraft_selected(self):
         selected_items = self.scene.selectedItems()
         if selected_items:
@@ -110,7 +120,6 @@ class MainWindow(QMainWindow):
     def animate_panels(self, show_info):
         self.sidebar_anim.stop()
         self.info_anim.stop()
-
         panel_height = min(600, self.height() - 200)
 
         if show_info:
@@ -140,7 +149,6 @@ class MainWindow(QMainWindow):
 
             self.aircraft_items[callsign].update_data(x, y, heading, ac_type)
 
-        # Update Sidebar tiap 1 detik agar lebih responsif
         now = time.time()
         if now - self.last_sidebar_update > 1.0:
             self.sidebar.update_data(data_dict)
