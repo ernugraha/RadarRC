@@ -346,7 +346,7 @@ class FilterPanel(QFrame):
     filters_changed = Signal(bool, int, bool)
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("PopupPanel") # <--- KUNCI UNTUK CSS
+        self.setObjectName("PopupPanel")
         self.setVisible(False)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -378,7 +378,7 @@ class SettingsPanel(QFrame):
     settings_changed = Signal(bool, bool, bool)
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("PopupPanel") # <--- KUNCI UNTUK CSS
+        self.setObjectName("PopupPanel")
         self.setVisible(False)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -405,7 +405,7 @@ class SettingsPanel(QFrame):
 class WeatherPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("PopupPanel") # <--- KUNCI UNTUK CSS
+        self.setObjectName("PopupPanel")
         self.setVisible(False)
         self.setFixedWidth(300)
         self.setFixedHeight(300)
