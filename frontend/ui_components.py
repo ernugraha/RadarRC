@@ -54,7 +54,7 @@ class TopBar(QWidget):
 
         self.search_bar = QLineEdit()
         self.search_bar.setObjectName("SearchBar")
-        self.search_bar.setPlaceholderText("Find flights (e.g., BAW123, PilotName)...")
+        self.search_bar.setPlaceholderText("Find flights (e.g., BAW123, PilotName)... (Press Enter)")
         self.search_bar.setFixedWidth(450)
         self.search_bar.returnPressed.connect(self.on_search_enter)
 
@@ -62,7 +62,7 @@ class TopBar(QWidget):
         layout.addStretch()
         layout.addWidget(self.search_bar)
         layout.addStretch()
-        layout.addWidget(view_btn)
+        # Tombol sudah dihapus total dari sini
 
     def on_search_enter(self):
         query = self.search_bar.text().strip()
