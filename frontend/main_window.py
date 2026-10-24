@@ -1,15 +1,16 @@
 # frontend/main_window.py
 
 import os
+import time
 from PySide6.QtWidgets import QMainWindow, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QFrame
 from PySide6.QtGui import QColor, QPen, QPixmap, QTransform
 from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve
-import time
 
 from frontend.styles import MAIN_STYLESHEET
 from frontend.ui_components import TopBar, Sidebar, BottomToolbar, MapControls, FlightInfoPanel
 from frontend.map_items import AircraftItem, load_icons
 from frontend.map_view import MapView
+from frontend.airlines import get_airline_icao
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -38,9 +39,10 @@ class MainWindow(QMainWindow):
 
         self.info_panel.closed.connect(self.close_info_panel)
         self.scene.selectionChanged.connect(self.on_aircraft_selected)
-
-        # Hubungkan klik dari sidebar ke fungsi fokus kamera
         self.sidebar.flight_clicked.connect(self.focus_on_aircraft)
+
+        # Hubungkan sinyal pencarian
+        self.top_bar.search_triggered.connect(self.perform_search)
 
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
@@ -54,13 +56,51 @@ class MainWindow(QMainWindow):
         self.sidebar.show()
         self.info_panel.hide()
 
+    def perform_search(self, query):
+        """Mencari pesawat berdasarkan Callsign, ICAO, Tipe, atau Nama Pilot."""
+        query = query.lower()
+        matched_callsign = None
+
+        for callsign, info in self.current_data.items():
+            # 1. Cek berdasarkan Callsign asli (misal: Shamrock-123)
+            if query in callsign.lower():
+                matched_callsign = callsign
+                break
+
+            # 2. Cek berdasarkan format ICAO (misal: BAW123)
+            icao = get_airline_icao(callsign)
+            flight_num = callsign.split("-")[-1] if "-" in callsign else ""
+            icao_format = f"{icao}{flight_num}".lower()
+            if query in icao_format:
+                matched_callsign = callsign
+                break
+
+            # 3. Cek berdasarkan Tipe Pesawat (misal: b737)
+            if query in info.get("aircraftType", "").lower():
+                matched_callsign = callsign
+                break
+
+            # 4. Cek berdasarkan Nama Pilot (misal: jeff)
+            if query in info.get("playerName", "").lower():
+                matched_callsign = callsign
+                break
+
+        if matched_callsign:
+            self.focus_on_aircraft(matched_callsign)
+            self.top_bar.search_bar.clear()
+        else:
+            self.top_bar.search_bar.setPlaceholderText("Flight not found. Try again...")
+
     def resizeEvent(self, event):
         w = self.width()
         h = self.height()
         self.top_bar.setGeometry(0, 0, w, 80)
+
         panel_height = min(650, h - 150)
+
         self.sidebar.setGeometry(20, 100, 340, panel_height)
         self.info_panel.setGeometry(-360, 100, 340, panel_height)
+
         self.map_controls.setGeometry(w - 60, h // 2 - 50, 40, 100)
         tb_w = 500
         self.bottom_toolbar.setGeometry((w - tb_w)//2, h - 90, tb_w, 60)
@@ -91,15 +131,10 @@ class MainWindow(QMainWindow):
         self.view.scale(0.5, 0.5)
 
     def focus_on_aircraft(self, callsign):
-        """Dipicu saat item di sidebar diklik."""
         if callsign in self.aircraft_items:
             item = self.aircraft_items[callsign]
-
-            # 1. Pilih pesawat di peta (memicu panel info terbuka)
             self.scene.clearSelection()
             item.setSelected(True)
-
-            # 2. Geser kamera peta agar fokus ke pesawat tersebut
             self.view.centerOn(item)
 
     def on_aircraft_selected(self):

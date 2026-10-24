@@ -4,18 +4,7 @@ import json
 import asyncio
 import websockets
 from PySide6.QtCore import QObject, Signal
-
-class FlightPlanStore:
-    def __init__(self):
-        self.plans = {}
-
-    def add(self, plan_data):
-        callsign = plan_data.get("callsign")
-        if callsign:
-            self.plans[callsign] = plan_data
-
-    def get(self, callsign):
-        return self.plans.get(callsign, {})
+from backend.flight_plan_store import FlightPlanStore # IMPORT STORE BARU
 
 class DataClient(QObject):
     aircraft_data_received = Signal(dict)
@@ -25,16 +14,25 @@ class DataClient(QObject):
         super().__init__()
         self.ws_url = "wss://24data.ptfs.app/wss"
         self.is_running = False
+
+        # Inisialisasi Database
         self.plan_store = FlightPlanStore()
-        self.reconnect_delay = 3  # Detik
+
+        self.reconnect_delay = 3
+        self._last_cleanup_time = 0
 
     def process_aircraft(self, payload):
         if not isinstance(payload, dict):
             return {}
+
         result = {}
+        active_callsigns = set()
+
         for callsign, ac in payload.items():
             if not isinstance(ac, dict):
                 continue
+
+            active_callsigns.add(callsign)
             pos = ac.get("position", {})
             entry = {
                 "x": float(pos.get("x", 0)),
@@ -46,55 +44,64 @@ class DataClient(QObject):
                 "speed": float(ac.get("speed", 0)),
                 "isOnGround": bool(ac.get("isOnGround", False)),
             }
-            plan = self.plan_store.get(callsign)
+
+            # Ambil flight plan dari DATABASE (bukan memori)
+            plan = self.plan_store.get_plan(callsign)
             if plan:
                 entry["plan_departing"] = plan.get("departing", "")
                 entry["plan_arriving"] = plan.get("arriving", "")
                 entry["plan_route"] = plan.get("route", "")
+
             result[callsign] = entry
+
+        # Jalankan pembersihan database setiap 30 detik sekali
+        now = asyncio.get_event_loop().time()
+        if now - self._last_cleanup_time > 30:
+            self.plan_store.cleanup_stale_plans(active_callsigns)
+            self._last_cleanup_time = now
+
         return result
 
     async def connect(self):
         self.is_running = True
+
         while self.is_running:
-            self.connection_status.emit(f"[INFO] Connecting to 24Data API...")
+            self.connection_status.emit("[INFO] Connecting to 24Data API...")
             try:
-                # KUNCI PERBAIKAN:
-                # 1. origin=None (tidak mengirim header Origin)
-                # 2. ping_interval=25 & ping_timeout=25 (heartbeat yang wajar)
                 async with websockets.connect(
                     self.ws_url,
                     origin=None,
-                    ping_interval=25,
-                    ping_timeout=25
+                    ping_interval=20,
+                    ping_timeout=20
                 ) as websocket:
                     self.connection_status.emit("[SUCCESS] Connected to 24Data WebSocket.")
-                    self.reconnect_delay = 3  # Reset delay setelah berhasil
+                    self.reconnect_delay = 3
 
                     while self.is_running:
                         try:
                             message = await websocket.recv()
                             data = json.loads(message)
                             event_type = data.get("t")
+
                             if event_type == "ACFT_DATA":
                                 processed = self.process_aircraft(data.get("d", {}))
                                 self.aircraft_data_received.emit(processed)
+
                             elif event_type == "FLIGHT_PLAN":
-                                self.plan_store.add(data.get("d", {}))
-                        except websockets.exceptions.ConnectionClosed as e:
-                            # Mencetak alasan penutupan yang sebenarnya
-                            self.connection_status.emit(f"[WARNING] Connection closed by server. Code: {e.code}, Reason: {e.reason}. Reconnecting...")
-                            break
-                        except Exception as e:
-                            self.connection_status.emit(f"[ERROR] An error occurred while receiving a message: {e}")
+                                plan_data = data.get("d", {})
+                                callsign = plan_data.get("callsign")
+                                if callsign:
+                                    self.plan_store.save_plan(callsign, plan_data)
+
+                        except websockets.exceptions.ConnectionClosed:
+                            self.connection_status.emit("[WARNING] Connection closed. Reconnecting...")
                             break
 
             except Exception as e:
-                self.connection_status.emit(f"[ERROR] Failed to connect: {e}")
+                self.connection_status.emit(f"[ERROR] Connection failed: {e}")
 
             if self.is_running:
                 await asyncio.sleep(self.reconnect_delay)
-                # Menambah delay secara perlahan agar tidak spam server (exponential backoff sederhana)
                 self.reconnect_delay = min(self.reconnect_delay * 2, 30)
 
     def stop(self):

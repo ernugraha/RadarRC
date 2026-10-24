@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QWidget, QScrollArea, QGridLayout, QApplication, QSizePolicy)
 from PySide6.QtCore import Qt, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QPen, QColor
-from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao # IMPORT ICAO
+from frontend.airlines import get_airline_name, get_airline_keys, get_airline_icao
 
 def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
     if not os.path.exists(photo_dir):
@@ -43,23 +43,33 @@ def find_aircraft_photo(callsign, aircraft_type, photo_dir="assets/aircraft"):
     return None
 
 class TopBar(QWidget):
+    search_triggered = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 0)
         logo = QLabel("RadarRC")
         logo.setObjectName("AppLogo")
-        search_bar = QLineEdit()
-        search_bar.setObjectName("SearchBar")
-        search_bar.setPlaceholderText("Find flights, airports and more...")
-        search_bar.setFixedWidth(450)
+
+        self.search_bar = QLineEdit()
+        self.search_bar.setObjectName("SearchBar")
+        self.search_bar.setPlaceholderText("Find flights (e.g., BAW123, PilotName)...")
+        self.search_bar.setFixedWidth(450)
+        self.search_bar.returnPressed.connect(self.on_search_enter)
+
         view_btn = QPushButton("VIEW Map v")
         view_btn.setObjectName("ViewMapBtn")
         layout.addWidget(logo)
         layout.addStretch()
-        layout.addWidget(search_bar)
+        layout.addWidget(self.search_bar)
         layout.addStretch()
         layout.addWidget(view_btn)
+
+    def on_search_enter(self):
+        query = self.search_bar.text().strip()
+        if query:
+            self.search_triggered.emit(query)
 
 class FlightPanel(QFrame):
     clicked = Signal(str)
@@ -77,16 +87,17 @@ class FlightPanel(QFrame):
         row1 = QHBoxLayout()
         self.lbl_callsign = QLabel("CALLSIGN")
         self.lbl_callsign.setStyleSheet("font-size: 14px; font-weight: bold; color: white;")
+        self.lbl_callsign.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
         self.lbl_type = QLabel("TYPE")
         self.lbl_type.setStyleSheet("color: #aaa; font-size: 11px; font-weight: bold; margin-left: 5px;")
+        self.lbl_type.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
         self.lbl_speed = QLabel("0 kts")
         self.lbl_speed.setObjectName("AccentText")
 
-        row1.addWidget(self.lbl_callsign)
-        row1.addWidget(self.lbl_type)
-        row1.addStretch() # Mendorong speed ke kanan
+        row1.addWidget(self.lbl_callsign, 1)
+        row1.addWidget(self.lbl_type, 1)
         row1.addWidget(self.lbl_speed)
 
         self.lbl_route = QLabel("N/A - N/A")
@@ -98,18 +109,13 @@ class FlightPanel(QFrame):
     def set_data(self, callsign, info):
         self.original_callsign = callsign
 
-        # AMBIL KODE ICAO (BAW, DAL, SIA, dll)
         icao = get_airline_icao(callsign)
-
-        # Pisahkan nomor penerbangan (misal: Speedbird-1234 -> 1234)
         parts = callsign.split("-")
         flight_num = parts[-1] if len(parts) > 1 else ""
 
-        # Format menjadi BAW1234 (jika ICAO ditemukan)
         if icao != "???":
             display_name = f"{icao}{flight_num}"
         else:
-            # Jika tidak ada di database, gunakan prefix aslinya (misal: Lancer)
             display_name = parts[0]
 
         self.lbl_callsign.setText(display_name)
@@ -137,7 +143,6 @@ class Sidebar(QFrame):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("background: transparent;")
-        # Matikan scrollbar horizontal agar tidak muncul
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         self.list_widget = QWidget()
@@ -180,7 +185,7 @@ class FlightInfoPanel(QFrame):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # ================= HEADER =================
+        # HEADER
         header_frame = QFrame()
         header_frame.setStyleSheet("background-color: #242424; border-top-left-radius: 12px; border-top-right-radius: 12px;")
         header_layout = QVBoxLayout(header_frame)
@@ -209,7 +214,7 @@ class FlightInfoPanel(QFrame):
         header_layout.addWidget(self.lbl_airline)
         main_layout.addWidget(header_frame)
 
-        # ================= PHOTO PLACEHOLDER =================
+        # PHOTO
         photo_frame = QFrame()
         photo_layout = QVBoxLayout(photo_frame)
         photo_layout.setContentsMargins(15, 15, 15, 0)
@@ -222,7 +227,7 @@ class FlightInfoPanel(QFrame):
         photo_layout.addWidget(self.photo_box)
         main_layout.addWidget(photo_frame)
 
-        # ================= ROUTE =================
+        # ROUTE
         route_frame = QFrame()
         route_layout = QHBoxLayout(route_frame)
         route_layout.setContentsMargins(15, 15, 15, 15)
@@ -243,7 +248,7 @@ class FlightInfoPanel(QFrame):
         route_layout.addWidget(self.lbl_arr, 1)
         main_layout.addWidget(route_frame)
 
-        # ================= TELEMETRY GRID =================
+        # TELEMETRY
         telemetry_frame = QFrame()
         tele_layout = QGridLayout(telemetry_frame)
         tele_layout.setContentsMargins(15, 5, 15, 15)
@@ -256,7 +261,7 @@ class FlightInfoPanel(QFrame):
 
         main_layout.addWidget(telemetry_frame)
 
-        # ================= PILOT INFO =================
+        # PILOT
         pilot_frame = QFrame()
         pilot_frame.setStyleSheet("background-color: #111; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
         pilot_layout = QVBoxLayout(pilot_frame)
@@ -318,7 +323,6 @@ class FlightInfoPanel(QFrame):
         self.current_pilot_name = info.get("playerName", "Unknown")
         self.btn_pilot.setText(self.current_pilot_name)
 
-        # ================= LOGIKA LOAD FOTO =================
         photo_path = find_aircraft_photo(callsign, info.get("aircraftType", ""))
 
         if photo_path:
