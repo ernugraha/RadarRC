@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
         self.show_trails = True
         self.show_all_labels = False
         self.sidebar_visible = True
+        self.active_popup = None
 
         # Inisialisasi Peta
         self.scene = QGraphicsScene()
@@ -70,7 +71,7 @@ class MainWindow(QMainWindow):
         self.filter_panel.filters_changed.connect(self.apply_filters)
         self.settings_panel.settings_changed.connect(self.apply_settings)
 
-        # Animasi Sidebar
+        # Animasi Sidebar Info
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
         self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -84,68 +85,71 @@ class MainWindow(QMainWindow):
         self.info_panel.hide()
 
     def on_tool_clicked(self, tool_name):
-        # Sembunyikan semua popup dulu dengan animasi
-        self.hide_all_popups()
+        if self.active_popup == tool_name:
+            self.hide_active_popup()
+            self.active_popup = None
+            return
+
+        self.hide_active_popup()
 
         if tool_name == "Filters":
-            self.animate_popup(self.filter_panel, True)
+            self.show_popup(self.filter_panel)
         elif tool_name == "Settings":
-            self.animate_popup(self.settings_panel, True)
+            self.show_popup(self.settings_panel)
         elif tool_name == "Weather":
             self.weather_panel.update_atis(self.current_atis_data)
-            self.animate_popup(self.weather_panel, True)
+            self.show_popup(self.weather_panel)
         elif tool_name == "Widgets":
+            # KUNCI ANIMASI WIDGETS
             self.sidebar_visible = not self.sidebar_visible
-            self.resizeEvent(None) # Trigger animasi resize
+            panel_height = min(750, self.height() - 120)
 
-    def hide_all_popups(self):
-        self.animate_popup(self.filter_panel, False)
-        self.animate_popup(self.settings_panel, False)
-        self.animate_popup(self.weather_panel, False)
+            self.sidebar_anim.stop()
+            self.sidebar_anim.setStartValue(self.sidebar.geometry())
 
-    def animate_popup(self, panel, show):
-        # Hentikan animasi jika ada yang sedang berjalan
-        if hasattr(panel, 'anim_opacity'): panel.anim_opacity.stop()
-        if hasattr(panel, 'anim_geom'): panel.anim_geom.stop()
+            if self.sidebar_visible:
+                self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            else:
+                self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
 
-        panel.setVisible(True) # Harus visible untuk animasi opacity
+            self.sidebar_anim.start()
+            return
+
+        self.active_popup = tool_name
+
+    def hide_active_popup(self):
+        for p in [self.filter_panel, self.settings_panel, self.weather_panel]:
+            if hasattr(p, 'anim_opacity'): p.anim_opacity.stop()
+            if hasattr(p, 'anim_geom'): p.anim_geom.stop()
+            p.setVisible(False)
+
+    def show_popup(self, panel):
+        panel.setVisible(True)
         opacity_effect = QGraphicsOpacityEffect(panel)
         panel.setGraphicsEffect(opacity_effect)
 
         panel.anim_opacity = QPropertyAnimation(opacity_effect, b"opacity")
-        panel.anim_opacity.setDuration(250)
+        panel.anim_opacity.setDuration(200)
+        panel.anim_opacity.setStartValue(0.0)
+        panel.anim_opacity.setEndValue(1.0)
 
-        # Posisi dari kode resizeEvent sebelumnya
         w = self.width()
         h = self.height()
         tb_w = 400
         tb_x = (w - tb_w) // 2
         tb_y = h - 90
-        popup_w = panel.width()
-        popup_h = panel.height()
 
-        # Posisi Akhir (Muncul di atas toolbar)
+        popup_w = panel.width() if panel.width() > 0 else 280
+        popup_h = panel.height() if panel.height() > 0 else 180
+
         end_rect = QRect(tb_x + (tb_w - popup_w)//2, tb_y - popup_h - 10, popup_w, popup_h)
-        # Posisi Awal (Tersembunyi 20px lebih rendah)
-        start_rect = QRect(end_rect.x(), end_rect.y() + 20, end_rect.width(), end_rect.height())
+        start_rect = QRect(end_rect.x(), end_rect.y() + 15, end_rect.width(), end_rect.height())
 
         panel.anim_geom = QPropertyAnimation(panel, b"geometry")
-        panel.anim_geom.setDuration(250)
+        panel.anim_geom.setDuration(200)
         panel.anim_geom.setEasingCurve(QEasingCurve.OutCubic)
-
-        if show:
-            panel.setGeometry(start_rect)
-            panel.anim_opacity.setStartValue(0.0)
-            panel.anim_opacity.setEndValue(1.0)
-            panel.anim_geom.setStartValue(start_rect)
-            panel.anim_geom.setEndValue(end_rect)
-        else:
-            panel.anim_opacity.setStartValue(1.0)
-            panel.anim_opacity.setEndValue(0.0)
-            panel.anim_geom.setStartValue(panel.geometry())
-            panel.anim_geom.setEndValue(start_rect)
-            # Sembunyikan panel sepenuhnya setelah animasi selesai
-            panel.anim_opacity.finished.connect(lambda: panel.setVisible(False))
+        panel.anim_geom.setStartValue(start_rect)
+        panel.anim_geom.setEndValue(end_rect)
 
         panel.anim_opacity.start()
         panel.anim_geom.start()
@@ -249,7 +253,11 @@ class MainWindow(QMainWindow):
             self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
             self.info_anim.setEndValue(QRect(20, 100, 340, panel_height))
         else:
-            self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            # Saat info panel ditutup, sidebar kembali sesuai state sidebar_visible
+            if self.sidebar_visible:
+                self.sidebar_anim.setEndValue(QRect(20, 100, 340, panel_height))
+            else:
+                self.sidebar_anim.setEndValue(QRect(-360, 100, 340, panel_height))
             self.info_anim.setEndValue(QRect(-360, 100, 340, panel_height))
 
         self.sidebar_anim.start()
