@@ -31,6 +31,9 @@ class MainWindow(QMainWindow):
         self.trail_manager = TrailManager(max_points=10000)
         self.current_trail_item = None
 
+        # State Auto-Follow
+        self.follow_callsign = None
+
         # State Variables
         self.filter_hide_ground = False
         self.filter_min_alt = 0
@@ -48,6 +51,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.view)
 
         self.setup_map()
+
+        # Hubungkan sinyal interaksi manual peta
+        self.view.user_panned.connect(self.stop_following)
 
         # Inisialisasi UI
         self.top_bar = TopBar(self.view)
@@ -84,6 +90,10 @@ class MainWindow(QMainWindow):
         self.sidebar.show()
         self.info_panel.hide()
 
+    def stop_following(self):
+        """Dipicu saat user menggeser peta secara manual."""
+        self.follow_callsign = None
+
     def on_tool_clicked(self, tool_name):
         if self.active_popup == tool_name:
             self.hide_active_popup()
@@ -100,11 +110,9 @@ class MainWindow(QMainWindow):
             self.weather_panel.update_atis(self.current_atis_data)
             self.show_popup(self.weather_panel)
         elif tool_name == "Widgets":
-            # KUNCI: Jika Info Pesawat sedang terbuka, tombol Widgets menutup Info Pesawat
             if self.info_panel.isVisible() and self.info_panel.geometry().x() == 20:
                 self.scene.clearSelection()
             else:
-                # Jika tidak ada info, toggle Sidebar Kiri
                 self.sidebar_visible = not self.sidebar_visible
                 self.update_sidebar_animation()
             return
@@ -149,7 +157,6 @@ class MainWindow(QMainWindow):
         panel.anim_geom.start()
 
     def update_sidebar_animation(self):
-        """Menganimasikan Sidebar kiri masuk/keluar."""
         panel_height = min(750, self.height() - 120)
         self.sidebar_anim.stop()
         self.sidebar_anim.setStartValue(self.sidebar.geometry())
@@ -189,7 +196,6 @@ class MainWindow(QMainWindow):
         self.top_bar.setGeometry(0, 0, w, 80)
         panel_height = min(750, h - 120)
 
-        # Atur posisi sidebar saat resize
         if self.sidebar_visible:
             self.sidebar.setGeometry(20, 100, 340, panel_height)
         else:
@@ -246,7 +252,17 @@ class MainWindow(QMainWindow):
             item = self.aircraft_items[callsign]
             self.scene.clearSelection()
             item.setSelected(True)
-            self.view.centerOn(item)
+
+            # KUNCI AUTO-FOLLOW & ZOOM
+            self.follow_callsign = callsign
+            current_zoom = self.view.transform().m11()
+
+            # Jika peta terlalu zoom out, zoom in perlahan
+            if current_zoom < 2.0:
+                self.view.scale(2.0 / current_zoom, 2.0 / current_zoom)
+
+            # Meluncur ke pesawat
+            self.view.smooth_center_on(item.pos())
 
     def close_flight_panel(self):
         self.scene.clearSelection()
@@ -279,7 +295,6 @@ class MainWindow(QMainWindow):
             self.sidebar_anim.start()
             self.info_anim.start()
 
-            # KUNCI: Sembunyikan Info Panel setelah animasi selesai
             QTimer.singleShot(300, self.check_hide_info_panel)
 
     def check_hide_info_panel(self):
@@ -301,12 +316,17 @@ class MainWindow(QMainWindow):
                     self.info_panel.set_flight_data(callsign, self.current_data[callsign])
                     self.animate_panels(show_info=True)
 
+                    # Set follow mode aktif
+                    self.follow_callsign = callsign
+
                     trail_points = self.trail_manager.get_trail(callsign)
                     if len(trail_points) > 1 and self.show_trails:
                         self.current_trail_item = TrailItem()
                         self.current_trail_item.set_points(trail_points)
                         self.scene.addItem(self.current_trail_item)
         else:
+            # Saat klik area kosong, matikan follow mode
+            self.follow_callsign = None
             self.animate_panels(show_info=False)
 
     def update_aircraft(self, data_dict):
@@ -339,6 +359,12 @@ class MainWindow(QMainWindow):
 
             self.aircraft_items[callsign].update_data(x, y, heading, ac_type, label_text)
             self.trail_manager.add_point(callsign, x, y, alt)
+
+        # KUNCI: Lakukan Auto-Follow setiap kali update
+        if self.follow_callsign and self.follow_callsign in self.aircraft_items:
+            item = self.aircraft_items[self.follow_callsign]
+            # Menggunakan centerOn langsung agar sangat responsif mengikuti pergerakan
+            self.view.centerOn(item.pos())
 
         for callsign in list(self.aircraft_items.keys()):
             if callsign not in active_callsigns:
