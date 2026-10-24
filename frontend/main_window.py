@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
             msg_box.exec()
 
     def get_panel_height(self):
-        return max(200, min(750, self.height() - 190))
+        return max(300, min(850, self.height() - 140))
 
     def stop_following(self):
         self.follow_callsign = None
