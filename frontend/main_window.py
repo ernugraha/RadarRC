@@ -2,8 +2,11 @@
 
 import os
 import time
-from PySide6.QtWidgets import QMainWindow, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QFrame, QGraphicsOpacityEffect
-from PySide6.QtGui import QColor, QPen, QPixmap, QTransform
+import sys
+from PySide6.QtWidgets import (QMainWindow, QGraphicsScene, QGraphicsPixmapItem,
+                               QGraphicsItem, QFrame, QGraphicsOpacityEffect,
+                               QMessageBox, QApplication)
+from PySide6.QtGui import QColor, QPen, QPixmap, QTransform, QIcon
 from PySide6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer
 
 from frontend.styles import MAIN_STYLESHEET
@@ -15,12 +18,20 @@ from frontend.airlines import get_airline_icao
 from frontend.trail_manager import TrailManager
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
 
+from backend.settings_manager import SettingsManager
+from backend.updater import AutoUpdater
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("RadarRC")
-        self.resize(1400, 900)
-        # KUNCI: Mencegah jendela dikecilkan terlalu ekstrem hingga UI rusak
+
+        if os.path.exists("assets/icon.png"):
+            self.setWindowIcon(QIcon("assets/icon.png"))
+
+        self.settings_mgr = SettingsManager()
+        self.resize(self.settings_mgr.get("window_width", 1400),
+                    self.settings_mgr.get("window_height", 900))
         self.setMinimumSize(1000, 600)
         self.setStyleSheet(MAIN_STYLESHEET)
 
@@ -35,39 +46,44 @@ class MainWindow(QMainWindow):
         self.current_trail_item = None
         self.follow_callsign = None
 
-        # State Variables
-        self.filter_hide_ground = False
-        self.filter_min_alt = 0
-        self.filter_hide_heli = False
-        self.show_boundaries = True
-        self.show_trails = True
-        self.show_all_labels = False
-        self.sidebar_visible = True
+        # LOAD SEMUA STATE DARI SETTINGS (Termasuk Filter)
+        self.filter_hide_ground = self.settings_mgr.get("filter_hide_ground", False)
+        self.filter_min_alt = self.settings_mgr.get("filter_min_alt", 0)
+        self.filter_hide_heli = self.settings_mgr.get("filter_hide_heli", False)
+
+        self.show_boundaries = self.settings_mgr.get("show_boundaries", True)
+        self.show_trails = self.settings_mgr.get("show_trails", True)
+        self.show_all_labels = self.settings_mgr.get("show_labels", False)
+        self.sidebar_visible = self.settings_mgr.get("sidebar_visible", True)
         self.active_popup = None
 
-        # Inisialisasi Peta
         self.scene = QGraphicsScene()
         self.view = MapView(self.scene, self)
         self.view.setFrameShape(QFrame.NoFrame)
         self.setCentralWidget(self.view)
 
         self.setup_map()
-
         self.view.user_panned.connect(self.stop_following)
 
-        # Inisialisasi UI
         self.top_bar = TopBar(self.view)
         self.sidebar = Sidebar(self.view)
         self.info_panel = FlightInfoPanel(self.view)
         self.map_controls = MapControls(self.view, self.view)
         self.bottom_toolbar = BottomToolbar(self.view)
 
-        # Panel Popup
         self.filter_panel = FilterPanel(self.view)
         self.settings_panel = SettingsPanel(self.view)
         self.weather_panel = WeatherPanel(self.view)
 
-        # Koneksi Sinyal
+        # SINKRONISASI UI DENGAN SETTINGS YANG DIMUAT
+        self.settings_panel.chk_bounds.setChecked(self.show_boundaries)
+        self.settings_panel.chk_trails.setChecked(self.show_trails)
+        self.settings_panel.chk_labels.setChecked(self.show_all_labels)
+
+        self.filter_panel.chk_ground.setChecked(self.filter_hide_ground)
+        self.filter_panel.chk_heli.setChecked(self.filter_hide_heli)
+        self.filter_panel.slider.setValue(self.filter_min_alt)
+
         self.info_panel.closed.connect(self.close_flight_panel)
         self.scene.selectionChanged.connect(self.on_aircraft_selected)
         self.sidebar.flight_clicked.connect(self.focus_on_aircraft)
@@ -77,7 +93,6 @@ class MainWindow(QMainWindow):
         self.filter_panel.filters_changed.connect(self.apply_filters)
         self.settings_panel.settings_changed.connect(self.apply_settings)
 
-        # Animasi Sidebar & Info Panel
         self.sidebar_anim = QPropertyAnimation(self.sidebar, b"geometry")
         self.sidebar_anim.setDuration(300)
         self.sidebar_anim.setEasingCurve(QEasingCurve.OutCubic)
@@ -87,14 +102,32 @@ class MainWindow(QMainWindow):
         self.info_anim.setEasingCurve(QEasingCurve.OutCubic)
 
         self.resizeEvent(None)
-        self.sidebar.show()
+
+        if self.sidebar_visible:
+            self.sidebar.show()
+        else:
+            self.sidebar.hide()
         self.info_panel.hide()
 
+        QTimer.singleShot(2000, self.run_auto_updater)
+
+    def run_auto_updater(self):
+        self.updater_thread = AutoUpdater()
+        self.updater_thread.update_finished.connect(self.on_update_finished)
+        self.updater_thread.start()
+
+    def on_update_finished(self, success, message):
+        if success:
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Pembaruan Tersedia")
+            msg_box.setText(message)
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            if msg_box.exec() == QMessageBox.Ok:
+                os.execl(sys.executable, sys.executable, *sys.argv)
+
     def get_panel_height(self):
-        """Menghitung tinggi panel secara dinamis agar tidak menabrak toolbar bawah."""
-        # 100px dari atas, 90px dari bawah (untuk toolbar dan margin)
         available_height = self.height() - 190
-        # Minimal tinggi panel 200px agar tetap terlihat, maksimal 750px
         return max(200, min(750, available_height))
 
     def stop_following(self):
@@ -145,7 +178,7 @@ class MainWindow(QMainWindow):
         h = self.height()
         tb_w = 400
         tb_x = (w - tb_w) // 2
-        tb_y = h - 80 # Sesuaikan dengan posisi toolbar baru
+        tb_y = h - 80
 
         popup_w = panel.width() if panel.width() > 0 else 280
         popup_h = panel.height() if panel.height() > 0 else 180
@@ -163,6 +196,8 @@ class MainWindow(QMainWindow):
         panel.anim_geom.start()
 
     def update_sidebar_animation(self):
+        self.settings_mgr.save({"sidebar_visible": self.sidebar_visible})
+
         ph = self.get_panel_height()
         self.sidebar_anim.stop()
         self.sidebar_anim.setStartValue(self.sidebar.geometry())
@@ -179,10 +214,23 @@ class MainWindow(QMainWindow):
         self.filter_min_alt = min_alt
         self.filter_hide_heli = hide_heli
 
+        # SIMPAN FILTER KE SETTINGS
+        self.settings_mgr.save({
+            "filter_hide_ground": hide_ground,
+            "filter_min_alt": min_alt,
+            "filter_hide_heli": hide_heli
+        })
+
     def apply_settings(self, show_bounds, show_trails, show_labels):
         self.show_boundaries = show_bounds
         self.show_trails = show_trails
         self.show_all_labels = show_labels
+
+        self.settings_mgr.save({
+            "show_boundaries": show_bounds,
+            "show_trails": show_trails,
+            "show_labels": show_labels
+        })
 
         if hasattr(self, 'boundaries_item'):
             self.boundaries_item.setVisible(self.show_boundaries)
@@ -213,7 +261,7 @@ class MainWindow(QMainWindow):
 
         tb_w = 400
         tb_x = (w - tb_w) // 2
-        tb_y = h - 80 # Toolbar selalu menempel 80px dari dasar layar
+        tb_y = h - 80
         self.bottom_toolbar.setGeometry(tb_x, tb_y, tb_w, 60)
 
     def setup_map(self):
@@ -235,6 +283,7 @@ class MainWindow(QMainWindow):
             self.boundaries_item = QGraphicsSvgItem(boundaries_path)
             self.boundaries_item.setZValue(-1.5)
             self.boundaries_item.setOpacity(0.3)
+            self.boundaries_item.setVisible(self.show_boundaries)
             self.scene.addItem(self.boundaries_item)
 
         self.scene.setSceneRect(-10000, -10000, 20000, 20000)
@@ -391,3 +440,12 @@ class MainWindow(QMainWindow):
         if now - self.last_sidebar_update > 1.0:
             self.sidebar.update_data(filtered_data)
             self.last_sidebar_update = now
+
+    def closeEvent(self, event):
+        # Cukup simpan ukuran jendela. Jangan panggil QApplication.instance().quit() di sini
+        # agar proses penulisan file JSON tidak terhenti paksa.
+        self.settings_mgr.save({
+            "window_width": self.width(),
+            "window_height": self.height()
+        })
+        event.accept()
