@@ -24,7 +24,6 @@ def main():
 
     ws_task = loop.create_task(client.connect())
 
-    # Flag untuk mencegah penutupan berjalan dua kali
     shutting_down = False
 
     def on_app_close():
@@ -34,8 +33,16 @@ def main():
         shutting_down = True
 
         print("\n[INFO] Closing app...")
-        client.stop()
 
+        # KUNCI PERBAIKAN: Putuskan semua sinyal agar UI tidak di-update saat sedang dihancurkan
+        try:
+            client.aircraft_data_received.disconnect()
+            client.atis_data_received.disconnect()
+            client.connection_status.disconnect()
+        except Exception:
+            pass
+
+        client.stop()
         if not ws_task.done():
             ws_task.cancel()
 

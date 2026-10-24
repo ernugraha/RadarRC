@@ -38,6 +38,7 @@ class DataClient(QObject):
                 "heading": float(ac.get("heading", 0)), "altitude": float(ac.get("altitude", 0)),
                 "playerName": player_name, "aircraftType": ac.get("aircraftType", ""),
                 "speed": float(ac.get("speed", 0)), "isOnGround": bool(ac.get("isOnGround", False)),
+                "isEmergency": bool(ac.get("isEmergencyOccuring", False)),
             }
 
             if player_name:
@@ -112,8 +113,7 @@ class DataClient(QObject):
                             break
 
             except asyncio.CancelledError:
-                # KUNCI PERBAIKAN: Tangkap pembatalan agar koneksi ditutup dengan rapi
-                self.connection_status.emit("[INFO] WebSocket task cancelled. Disconnecting...")
+                # KUNCI: Keluar dengan senyap tanpa memicu sinyal ke UI yang sedang tutup
                 break
             except Exception as e:
                 self.connection_status.emit(f"[ERROR] Connection failed: {e}")
