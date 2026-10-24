@@ -26,7 +26,7 @@ QFrame#FlightPanel:hover {
     border: 1px solid #f4b400;
 }
 
-/* --- SCROLLBAR CUSTOM (DITIPISKAN) --- */
+/* --- SCROLLBAR DISEMBUNYIKAN TOTAL (TAPI TETAP BISA SCROLL) --- */
 QScrollArea {
     border: none;
     background: transparent;
@@ -34,16 +34,11 @@ QScrollArea {
 QScrollBar:vertical {
     border: none;
     background: transparent;
-    width: 4px; /* <-- Lebar scrollbar dibuat sangat tipis */
+    width: 0px;  /* <--- KUNCI: Lebar 0 agar tidak terlihat */
     margin: 0px;
 }
 QScrollBar::handle:vertical {
-    background: #f4b400;
-    min-height: 30px;
-    border-radius: 2px; /* Ujung membulat */
-}
-QScrollBar::handle:vertical:hover {
-    background: #ffc400;
+    background: transparent;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
@@ -140,8 +135,6 @@ QLabel#RouteCode {
     font-weight: bold;
     color: white;
 }
-
-/* --- TELEMETRY BOX (BORDER DIPERTEGAS) --- */
 QFrame#TelemetryBox {
     background-color: #222;
     border: 1px solid #444;
