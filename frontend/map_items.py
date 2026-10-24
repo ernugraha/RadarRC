@@ -110,7 +110,67 @@ class AircraftItem(QGraphicsItem):
         path.addEllipse(QRectF(-15, -15, 30, 30))
         return path
 
+# (Di dalam class AircraftItem)
+
     def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        # 1. Efek Seleksi
+        if self.isSelected():
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor(255, 255, 255, 60)))
+            painter.drawEllipse(-12, -12, 24, 24)
+
+        # 2. KUNCI EFEK KEDIP: Ubah transparansi ikon
+        if self.is_emergency and self.flash_state:
+            painter.setOpacity(0.2) # Ikon jadi transparan (berkedip)
+        else:
+            painter.setOpacity(1.0) # Ikon terlihat jelas
+
+        # 3. Gambar Outline Merah Tipis (Hanya saat emergency)
+        if self.is_emergency:
+            painter.setPen(QPen(QColor("#ff0000"), 1.5))
+            painter.setBrush(Qt.NoBrush)
+            # Lingkaran kecil pas di sekeliling ikon
+            painter.drawEllipse(-self.icon_size/2 - 2, -self.icon_size/2 - 2, self.icon_size + 4, self.icon_size + 4)
+
+        # 4. Gambar Ikon Pesawat
+        icon_name = get_icon_for_aircraft(self.aircraft_type)
+        renderer = _SVG_CACHE.get(icon_name) if icon_name else None
+
+        if renderer:
+            target_rect = QRectF(-self.icon_size/2, -self.icon_size/2, self.icon_size, self.icon_size)
+            renderer.render(painter, target_rect)
+        else:
+            # Panah Default (Jika tidak ada SVG)
+            color = QColor("#f4b400") if not self.is_emergency else QColor("#ff0000")
+            painter.setBrush(QBrush(color))
+            painter.setPen(QPen(QColor("#000000"), 1))
+            s = self.size
+            painter.drawPolygon(QPolygonF([
+                QPointF(0, -s * 1.2), QPointF(s * 0.8, s * 1.0),
+                QPointF(0, s * 0.6), QPointF(-s * 0.8, s * 1.0)
+            ]))
+
+        # 5. Gambar Label Callsign (Jika dipilih / hover)
+        if self.isSelected() or self.is_hovered or self.always_show_label:
+            painter.save()
+            painter.setOpacity(1.0) # Pastikan label tidak ikut berkedip
+            painter.rotate(-self.heading)
+            font = QFont("Arial", 8, QFont.Bold)
+            painter.setFont(font)
+            metrics = painter.fontMetrics()
+            text_width = metrics.horizontalAdvance(self.label_text) + 8
+            text_height = metrics.height() + 2
+            label_rect = QRectF(12, -text_height / 2, text_width, text_height)
+            painter.setPen(QPen(QColor(180, 180, 180), 1))
+            painter.setBrush(QBrush(QColor(255, 255, 255, 230)))
+            painter.drawRoundedRect(label_rect, 3, 3)
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(label_rect, Qt.AlignCenter, self.label_text)
+            painter.restore()
+
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
 

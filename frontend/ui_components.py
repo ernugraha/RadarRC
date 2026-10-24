@@ -748,7 +748,7 @@ class EmergencyAlertPanel(QFrame):
 
         self.setVisible(True)
         for cs in emergencies:
-            btn = QPushButton(f"! {cs}")
+            btn = QPushButton(f"{cs}")
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #ff0000;
