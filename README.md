@@ -1,6 +1,6 @@
 # RadarRC - ATC24 Flight Tracker
 
-RadarRC is a modern desktop Flight Tracker application for PTFS (Pilot Training Flight Simulator) / ATC24. Built with Python and PySide6, it features a smooth, dark-themed user interface heavily inspired by Flightradar24.
+RadarRC is a modern desktop Flight Tracker application for PTFS (Pilot Training Flight Simulator) / ATC24 that run locally. Built with Python and PySide6, it features a smooth, dark-themed user interface heavily inspired by Flightradar24.
 
 ![RadarRC Preview](assets/radarRC.png)
 
@@ -45,3 +45,7 @@ RadarRC is a modern desktop Flight Tracker application for PTFS (Pilot Training 
     python3 run.py
     ```
 
+## Credits
+* [24Data API](https://24data.ptfs.app/) - Real-time flight data provider for PTFS/ATC24.
+* [FlightRadar24](https://www.flightradar24.com/) - UI inspiration and provider of aircraft icons.
+* [FlightEye](https://flighteye.org/flighteye/) - Referrence for this project.
