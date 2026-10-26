@@ -7,3 +7,4 @@ download_assets.py
 RadarRC.spec
 /build
 /dist
+/assets/aircraft
